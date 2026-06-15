@@ -339,6 +339,20 @@ function renderFicha(id){
     </div>`;
   }
 
+  // Automatizaciones
+  const autos = [p.auto1, p.auto2].filter(a => a && a.nombre);
+  if(autos.length){
+    html += `<div class="card">
+      <div class="ch"><span class="ct">Automatizaciones</span></div>
+      <div class="card-body">
+        ${autos.map(a => `<div style="margin-bottom:12px">
+          <div style="font-size:11px;font-weight:700;color:var(--primary-light);font-family:monospace;margin-bottom:4px">${esc(a.nombre)}</div>
+          <div style="font-size:12px;color:var(--text2);white-space:pre-wrap;line-height:1.6">${esc(a.desc)}</div>
+        </div>`).join('<hr style="border:none;border-top:1px solid var(--border);margin:10px 0">')}
+      </div>
+    </div>`;
+  }
+
   // Links
   if(p.links && p.links.length){
     html += `<div class="card">
@@ -540,6 +554,12 @@ function formProy(p){
     <div class="fg"><label>Fecha inicio</label><input id="pf-finicio" type="date" value="${p?p.fechaInicio||'':''}"></div>
     <div class="fg"><label>Fecha est. fin</label><input id="pf-festfin" type="date" value="${p?p.fechaEstFin||'':''}"></div>
     <div class="fg full"><label>Dispositivos involucrados</label><textarea id="pf-dispositivos" rows="2" placeholder="ej: sensor.temperatura_living, switch.luz_cocina...">${esc(p?p.dispositivos:'')}</textarea></div>
+    <div class="fg full" style="border-top:1px solid var(--border);padding-top:10px;margin-top:4px"><label style="color:var(--text2)">Automatización 1</label></div>
+    <div class="fg"><label>Nombre</label><input id="pf-auto1n" value="${esc(p&&p.auto1?p.auto1.nombre:'')}" placeholder="alias de la automatización"></div>
+    <div class="fg full"><label>Descripción</label><textarea id="pf-auto1d" rows="3" placeholder="Qué hace...">${esc(p&&p.auto1?p.auto1.desc:'')}</textarea></div>
+    <div class="fg full" style="border-top:1px solid var(--border);padding-top:10px;margin-top:4px"><label style="color:var(--text2)">Automatización 2 (opcional)</label></div>
+    <div class="fg"><label>Nombre</label><input id="pf-auto2n" value="${esc(p&&p.auto2?p.auto2.nombre:'')}" placeholder="alias de la automatización"></div>
+    <div class="fg full"><label>Descripción</label><textarea id="pf-auto2d" rows="3" placeholder="Qué hace...">${esc(p&&p.auto2?p.auto2.desc:'')}</textarea></div>
   </div>`;
 }
 
@@ -567,6 +587,8 @@ function guardarNuevoProy(){
     fechaEstFin: document.getElementById('pf-festfin').value,
     fechaFinReal:'',
     dispositivos:document.getElementById('pf-dispositivos').value.trim(),
+    auto1: { nombre:'', desc:'' },
+    auto2: { nombre:'', desc:'' },
     operaciones: [],
     links:       [],
     historial:   []
@@ -600,6 +622,8 @@ function guardarEditarProy(id){
   p.fechaInicio  = document.getElementById('pf-finicio').value;
   p.fechaEstFin  = document.getElementById('pf-festfin').value;
   p.dispositivos = document.getElementById('pf-dispositivos').value.trim();
+  p.auto1 = { nombre: (document.getElementById('pf-auto1n').value||'').trim(), desc: (document.getElementById('pf-auto1d').value||'').trim() };
+  p.auto2 = { nombre: (document.getElementById('pf-auto2n').value||'').trim(), desc: (document.getElementById('pf-auto2d').value||'').trim() };
   agregarHistorial(p, 'Datos editados');
   save();
   cerrarModal();
