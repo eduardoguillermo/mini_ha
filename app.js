@@ -34,6 +34,7 @@ function load(){
     if(!DB.config)      DB.config = {};
     if(!DB.config.categorias)  DB.config.categorias = ['Automatización','Hardware','Mantenimiento','Integración','Bug fix','Dashboard','Red','Otro'];
     if(!DB.config.empresa)     DB.config.empresa = 'Casa HA';
+    if(!DB.config.materialesManual) DB.config.materialesManual = [];
     if(!DB.config.plantillas)  DB.config.plantillas = [
       'Editar configuration.yaml',
       'Reiniciar Home Assistant',
@@ -644,11 +645,12 @@ function renderConfig(){
   document.getElementById('pacts').innerHTML = '';
   const cats = (DB.config.categorias||[]).join('\n');
   const pls  = (DB.config.plantillas||[]).join('\n');
+  const mans = (DB.config.materialesManual||[]).join('\n');
   const html = `<div class="card">
     <div class="ch"><span class="ct">Categorías de subproyecto</span></div>
     <div class="card-body">
       <div class="fg"><label>Una categoría por línea</label>
-        <textarea id="cfg-cats" rows="8" style="font-family:monospace">${esc(cats)}</textarea>
+        <textarea id="cfg-cats" rows="6" style="font-family:monospace">${esc(cats)}</textarea>
       </div>
     </div>
   </div>
@@ -657,7 +659,16 @@ function renderConfig(){
     <div class="card-body">
       <p class="text2" style="font-size:11px;margin-bottom:8px">Operaciones reutilizables. Una por línea.</p>
       <div class="fg">
-        <textarea id="cfg-pls" rows="10" style="font-family:monospace">${esc(pls)}</textarea>
+        <textarea id="cfg-pls" rows="8" style="font-family:monospace">${esc(pls)}</textarea>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ch"><span class="ct">Lista de materiales manuales</span></div>
+    <div class="card-body">
+      <p class="text2" style="font-size:11px;margin-bottom:8px">Nombres reutilizables para materiales manuales. Una por línea.</p>
+      <div class="fg">
+        <textarea id="cfg-mans" rows="8" style="font-family:monospace">${esc(mans)}</textarea>
       </div>
     </div>
   </div>
@@ -671,8 +682,11 @@ function guardarConfig(){
   const pls  = (document.getElementById('cfg-pls').value||'')
     .split('\n').map(s=>s.trim()).filter(Boolean);
   if(!cats.length){ alert('Necesitás al menos una categoría.'); return; }
-  DB.config.categorias = cats;
-  DB.config.plantillas = pls;
+  const mans = (document.getElementById('cfg-mans').value||'')
+    .split('\n').map(s=>s.trim()).filter(Boolean);
+  DB.config.categorias      = cats;
+  DB.config.plantillas      = pls;
+  DB.config.materialesManual = mans;
   save();
   alert('Configuración guardada.');
 }
@@ -778,13 +792,28 @@ function modalNuevoMaterial(proyId){
       </div>`
     : `<div class="alert alert-info" style="margin-bottom:12px">Sin catálogo VSS. Importalo en Backup para usar esta sección.</div>`;
 
+  const listaMan = DB.config.materialesManual || [];
+  const optsMan  = listaMan.length
+    ? `<option value="">-- escribir nuevo --</option>` + listaMan.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('')
+    : '';
+
   const secManual = `<div class="mat-seccion">
       <div class="mat-seccion-title">Material manual <span class="text3" style="font-weight:400">(no exportable a VSS)</span></div>
       <div class="fgrid">
-        <div class="fg full"><label>Nombre</label><input id="mat-libre" placeholder="Nombre del material..."></div>
+        ${listaMan.length ? `<div class="fg full"><label>Desde lista</label>
+          <select id="mat-lista-m" onchange="(function(){var v=document.getElementById('mat-lista-m').value;var el=document.getElementById('mat-libre');if(el&&v){el.value=v;}})()">
+            ${optsMan}
+          </select></div>` : ''}
+        <div class="fg full"><label>${listaMan.length ? 'O nombre nuevo' : 'Nombre'}</label>
+          <input id="mat-libre" placeholder="Nombre del material...">
+        </div>
         <div class="fg"><label>Cantidad</label><input id="mat-cant-m" type="number" min="0" step="any" placeholder="0"></div>
         <div class="fg"><label>Costo unitario $</label><input id="mat-costo-m" type="number" min="0" step="any" placeholder="0"></div>
         <div class="fg full"><label>Notas</label><input id="mat-notas-m" placeholder="Observaciones..."></div>
+        <div class="fg full"><label style="flex-direction:row;align-items:center;gap:6px;cursor:pointer">
+          <input type="checkbox" id="mat-guardar-lista" style="accent-color:var(--primary);width:14px;height:14px">
+          Guardar nombre en la lista para uso futuro
+        </label></div>
       </div>
     </div>`;
 
@@ -825,6 +854,15 @@ function guardarMaterial(proyId){
     if(costoMan != null && !isNaN(costoMan)) mat.costoManual = costoMan;
     p.materiales.push(mat);
     agregados++;
+    // Guardar en lista si checkbox marcado y nombre nuevo
+    const guardarLista = document.getElementById('mat-guardar-lista');
+    if(guardarLista && guardarLista.checked){
+      if(!DB.config.materialesManual) DB.config.materialesManual = [];
+      if(!DB.config.materialesManual.includes(libre)){
+        DB.config.materialesManual.push(libre);
+        DB.config.materialesManual.sort((a,b) => a.localeCompare(b));
+      }
+    }
   }
 
   if(!agregados){ alert('Completá al menos una sección.'); return; }
