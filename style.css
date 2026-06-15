@@ -146,6 +146,11 @@ tr:hover td{background:rgba(255,255,255,.02)}
 .alert-warn{background:rgba(210,153,34,.1);border:1px solid rgba(210,153,34,.25);color:#d29922}
 .alert-info{background:rgba(88,166,255,.08);border:1px solid rgba(88,166,255,.2);color:#58a6ff}
 
+/* ── SECCIONES MODAL MATERIAL ────────────────────────────────── */
+.mat-seccion{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;margin-bottom:4px}
+.mat-seccion-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);margin-bottom:10px}
+.mat-sep{height:8px}
+
 /* ── SCROLLBAR ────────────────────────────────────────────── */
 ::-webkit-scrollbar{width:6px;height:6px}
 ::-webkit-scrollbar-track{background:transparent}
