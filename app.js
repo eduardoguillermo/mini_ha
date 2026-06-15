@@ -139,6 +139,10 @@ function renderDashboard(){
   const finalizados = DB.proyectosHA.filter(p => p.estado === 'Finalizado');
   const total    = DB.proyectosHA.length;
 
+  const costoTotal     = DB.proyectosHA.reduce((a, p) => a + costoSubproy(p), 0);
+  const costoActivos   = activos.reduce((a, p) => a + costoSubproy(p), 0);
+  const costoFin       = finalizados.reduce((a, p) => a + costoSubproy(p), 0);
+
   let html = `
   <div class="stats">
     <div class="stat"><div class="stat-n blue">${total}</div><div class="stat-l">Total</div></div>
@@ -146,7 +150,12 @@ function renderDashboard(){
     <div class="stat"><div class="stat-n amber">${planif.length}</div><div class="stat-l">Planificados</div></div>
     <div class="stat"><div class="stat-n amber">${pausados.length}</div><div class="stat-l">Pausados</div></div>
     <div class="stat"><div class="stat-n green">${finalizados.length}</div><div class="stat-l">Finalizados</div></div>
-  </div>`;
+  </div>
+  ${costoTotal ? `<div class="stats">
+    <div class="stat"><div class="stat-n" style="color:var(--primary-light)">${fmtPesos(costoTotal)}</div><div class="stat-l">Costo total</div></div>
+    ${costoActivos ? `<div class="stat"><div class="stat-n amber">${fmtPesos(costoActivos)}</div><div class="stat-l">En curso</div></div>` : ''}
+    ${costoFin ? `<div class="stat"><div class="stat-n green">${fmtPesos(costoFin)}</div><div class="stat-l">Finalizados</div></div>` : ''}
+  </div>` : ''}`;
 
   if(activos.length){
     html += `<div class="card">
@@ -698,26 +707,51 @@ function importarBackup(ev){
 }
 
 // ── MATERIALES EN SUBPROYECTO ─────────────────────────────────────────────────
+function costoMaterial(m){
+  if(m.costoManual != null) return m.costoManual * m.cant;
+  const comp = DB.catalogoVSS.find(c => c.id === m.compId);
+  return comp ? (comp.costo||0) * m.cant : 0;
+}
+
+function costoSubproy(p){
+  return (p.materiales||[]).reduce((acc, m) => acc + costoMaterial(m), 0);
+}
+
+function fmtPesos(n){
+  return '$' + Math.round(n).toLocaleString('es-AR');
+}
+
 function renderMateriales(p){
   if(!p.materiales || !p.materiales.length){
     return `<div class="empty" style="padding:16px">Sin materiales registrados.</div>`;
   }
+  const total = costoSubproy(p);
   return `<table>
     <thead><tr>
-      <th>Componente</th><th>Cant. usada</th><th>Notas</th><th></th>
+      <th>Componente</th><th>Cant.</th><th>Costo unit.</th><th>Subtotal</th><th>Notas</th><th></th>
     </tr></thead>
     <tbody>${p.materiales.map((m,i) => {
-      const comp = DB.catalogoVSS.find(c => c.id === m.compId);
-      const nombre = comp ? `${comp.codigo ? comp.codigo+' — ' : ''}${comp.nombre}` : (m.nombreLibre||'(sin catálogo)');
+      const comp      = DB.catalogoVSS.find(c => c.id === m.compId);
+      const nombre    = comp ? `${comp.codigo ? comp.codigo+' — ' : ''}${comp.nombre}` : (m.nombreLibre||'(sin catálogo)');
+      const costoUnit = m.costoManual != null ? m.costoManual : (comp ? comp.costo||0 : null);
+      const subtotal  = costoMaterial(m);
+      const esManual  = m.costoManual != null;
       return `<tr>
-        <td style="font-size:12px">${esc(nombre)}</td>
+        <td style="font-size:12px">${esc(nombre)}${esManual?'<span class="text3" style="font-size:9px;margin-left:4px">manual</span>':''}</td>
         <td style="font-size:12px">${m.cant} ${comp?esc(comp.unidad||''):''}</td>
+        <td style="font-size:12px;color:var(--text2)">${costoUnit != null ? fmtPesos(costoUnit) : '<span class="text3">--</span>'}</td>
+        <td style="font-size:12px;font-weight:600">${subtotal ? fmtPesos(subtotal) : '<span class="text3">--</span>'}</td>
         <td style="font-size:11px;color:var(--text2)">${esc(m.notas||'')}</td>
         <td>
           <button class="btn btn-sm btn-d" onclick="eliminarMaterial(${p.id},${i})">✕</button>
         </td>
       </tr>`;
     }).join('')}</tbody>
+    ${total ? `<tfoot><tr>
+      <td colspan="3" style="text-align:right;font-size:11px;color:var(--text2);padding:8px 10px">Total materiales</td>
+      <td style="font-weight:700;font-size:13px;color:var(--primary-light);padding:8px 10px">${fmtPesos(total)}</td>
+      <td colspan="2"></td>
+    </tr></tfoot>` : ''}
   </table>`;
 }
 
@@ -747,7 +781,8 @@ function modalNuevoMaterial(proyId){
     `${selectorCat}
      <div class="fgrid">
        <div class="fg"><label>Cantidad usada *</label><input id="mat-cant" type="number" min="0" step="any" placeholder="0"></div>
-       <div class="fg"><label>Notas</label><input id="mat-notas" placeholder="Observaciones..."></div>
+       <div class="fg"><label>Costo unit. manual $<span class="text3" style="font-weight:400"> (opcional — sobreescribe catálogo)</span></label><input id="mat-costo" type="number" min="0" step="any" placeholder="Dejar vacío para usar catálogo"></div>
+       <div class="fg full"><label>Notas</label><input id="mat-notas" placeholder="Observaciones..."></div>
      </div>`,
     `<button class="btn" onclick="cerrarModal()">Cancelar</button>
      <button class="btn btn-p" onclick="guardarMaterial(${proyId})">Agregar</button>`
@@ -761,16 +796,19 @@ function guardarMaterial(proyId){
   const compIdRaw = document.getElementById('mat-comp') ? document.getElementById('mat-comp').value : '';
   const compId    = compIdRaw ? parseInt(compIdRaw) : null;
   const libre     = document.getElementById('mat-libre') ? (document.getElementById('mat-libre').value||'').trim() : '';
-  const cant      = parseFloat(document.getElementById('mat-cant').value);
-  const notas     = (document.getElementById('mat-notas').value||'').trim();
+  const cant       = parseFloat(document.getElementById('mat-cant').value);
+  const costoRaw   = document.getElementById('mat-costo') ? document.getElementById('mat-costo').value : '';
+  const costoManual= costoRaw !== '' && costoRaw != null ? parseFloat(costoRaw) : null;
+  const notas      = (document.getElementById('mat-notas').value||'').trim();
 
   if(!compId && !libre){ alert('Seleccioná un componente o ingresá un nombre.'); return; }
   if(!cant || cant <= 0){ alert('Ingresá una cantidad válida.'); return; }
 
   if(!p.materiales) p.materiales = [];
   const mat = { cant, notas };
-  if(compId)      mat.compId = compId;
-  else            mat.nombreLibre = libre;
+  if(compId)        mat.compId = compId;
+  else              mat.nombreLibre = libre;
+  if(costoManual != null && !isNaN(costoManual)) mat.costoManual = costoManual;
   p.materiales.push(mat);
   save();
   cerrarModal();
