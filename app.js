@@ -372,17 +372,22 @@ function renderOps(p){
   if(!p.operaciones || !p.operaciones.length){
     return `<div class="empty" style="padding:16px">Sin operaciones. Agregá la primera.</div>`;
   }
-  return p.operaciones.map((op,i) =>
-    `<div class="op-item ${op.hecha?'hecha':''}" id="op-${p.id}-${i}">
-      <input type="checkbox" ${op.hecha?'checked':''} onchange="toggleOp(${p.id},${i})">
-      <span class="op-desc ${op.hecha?'hecha':''}">${esc(op.desc)}</span>
+  return p.operaciones.map((op,i) => {
+    const bloqueada = i > 0 && !p.operaciones[i-1].hecha;
+    const itemCls   = op.hecha ? 'hecha' : (bloqueada ? 'bloqueada' : '');
+    const descCls   = op.hecha ? 'hecha' : '';
+    const lockTip   = bloqueada ? ` title="Completá la operación ${i} primero"` : '';
+    return `<div class="op-item ${itemCls}" id="op-${p.id}-${i}">
+      <span class="op-num">${i+1}</span>
+      <input type="checkbox" ${op.hecha?'checked':''} ${bloqueada?'disabled':''} onchange="toggleOp(${p.id},${i})"${lockTip}>
+      <span class="op-desc ${descCls}">${esc(op.desc)}${bloqueada?' <span class="op-lock">&#128274;</span>':''}</span>
       <div class="op-actions">
         <button class="btn btn-sm" onclick="moverOp(${p.id},${i},-1)" ${i===0?'disabled':''}>↑</button>
         <button class="btn btn-sm" onclick="moverOp(${p.id},${i},1)" ${i===p.operaciones.length-1?'disabled':''}>↓</button>
         <button class="btn btn-sm btn-d" onclick="eliminarOp(${p.id},${i})">✕</button>
       </div>
-    </div>`
-  ).join('');
+    </div>`;
+  }).join('');
 }
 
 // ── OPERACIONES ───────────────────────────────────────────────────────────────
