@@ -254,7 +254,7 @@ function filtrarProyectos(){
 
   cont.innerHTML = `<div class="twrap"><table>
     <thead><tr>
-      <th>#</th><th>Título</th><th>Categoría</th><th>Estado</th>
+      <th>#</th><th>Título</th><th>Categoría</th><th>Rubro</th><th>Estado</th>
       <th>Inicio</th><th>Est. fin</th><th>Avance</th><th></th>
     </tr></thead>
     <tbody>${lista.map(p => {
@@ -263,6 +263,7 @@ function filtrarProyectos(){
         <td class="mono text3" style="font-size:10px">${esc(p.numero)}</td>
         <td style="font-weight:600">${esc(p.titulo)}</td>
         <td class="text2" style="font-size:11px">${esc(p.categoria||'--')}</td>
+        <td class="text2" style="font-size:11px">${esc(p.rubro||'--')}</td>
         <td>${pill(p.estado)}</td>
         <td class="text2" style="font-size:11px">${fmtFecha(p.fechaInicio)}</td>
         <td class="text2" style="font-size:11px">${fmtFecha(p.fechaEstFin)}</td>
