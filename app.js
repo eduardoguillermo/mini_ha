@@ -1075,7 +1075,7 @@ function mostrarSplash(){
     </div>
     <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:3rem 2rem;">
       <div style="margin-bottom:2.5rem;text-align:center;">
-        <div style="font-size:20px;font-weight:300;letter-spacing:0.03em;color:#c8d8e0;line-height:1.4;">Sistema de gestión de mini proyectos</div>
+        <div style="font-size:20px;font-weight:500;letter-spacing:0.03em;color:#c8d8e0;line-height:1.4;">Sistema de gestión de mini proyectos</div>
       </div>
       <div style="width:100%;max-width:400px;margin-bottom:1rem;">
         <div style="position:relative;height:1px;background:#2a2e35;">
