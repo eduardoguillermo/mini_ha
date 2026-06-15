@@ -984,7 +984,7 @@ function importarCatalogoVSS(ev){
 // ── REPORTES ──────────────────────────────────────────────────────────────────
 function renderReportes(){
   const pacts = document.getElementById('pacts');
-  pacts.innerHTML = `<button class="btn btn-sm" onclick="exportarReporteCSV()">⬇ Exportar CSV</button>`;
+  pacts.innerHTML = `<button class="btn btn-sm" onclick="exportarReporteXLSX()">⬇ Exportar Excel</button>`;
 
   const ps = DB.proyectosHA || [];
 
@@ -1098,20 +1098,28 @@ function renderReportes(){
   document.getElementById('content').innerHTML = html;
 }
 
-function exportarReporteCSV(){
+function exportarReporteXLSX(){
   const ps = DB.proyectosHA || [];
   const cols = ['Numero','Titulo','Estado','Categoria','Rubro','Costo','FechaInicio','FechaEstFin','FechaFinReal','Dispositivos'];
   const rows = ps.map(p => [
     p.numero, p.titulo, p.estado, p.categoria||'', p.rubro||'',
     costoSubproy(p), p.fechaInicio||'', p.fechaEstFin||'', p.fechaFinReal||'',
     p.dispositivos||''
-  ].map(v => `"${String(v).replace(/"/g,'""')}"`).join(','));
-  const csv = [cols.join(','), ...rows].join('\r\n');
-  const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `mini-ha-reporte-${new Date().toISOString().slice(0,10)}.csv`;
-  a.click();
+  ]);
+
+  const script = document.createElement('script');
+  script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+  script.onload = function(){
+    const wb = XLSX.utils.book_new();
+    const wsData = [cols, ...rows];
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    // ancho de columnas
+    ws['!cols'] = [8,32,14,16,14,12,12,12,12,20].map(w=>({wch:w}));
+    XLSX.utils.book_append_sheet(wb, ws, 'Subproyectos');
+    XLSX.writeFile(wb, `mini-ha-reporte-${new Date().toISOString().slice(0,10)}.xlsx`);
+  };
+  script.onerror = function(){ alert('Error cargando SheetJS. Verificar conexion.'); };
+  document.head.appendChild(script);
 }
 
 // ── BACKUP ────────────────────────────────────────────────────────────────────
