@@ -760,30 +760,36 @@ function modalNuevoMaterial(proyId){
   if(!p) return;
 
   const tieneCatalogo = DB.catalogoVSS.length > 0;
-  const selectorCat = tieneCatalogo
-    ? `<div class="fg"><label>Componente del catálogo VSS</label>
-        <select id="mat-comp">
-          <option value="">-- seleccionar --</option>
-          ${DB.catalogoVSS.map(c =>
-            `<option value="${c.id}">${esc((c.codigo?c.codigo+' — ':'')+c.nombre)}${c.unidad?' ('+c.unidad+')':''}</option>`
-          ).join('')}
-        </select>
-      </div>
-      <div class="fg"><label>O nombre libre (si no está en catálogo)</label>
-        <input id="mat-libre" placeholder="Nombre del componente...">
+  const secCatalogo = tieneCatalogo
+    ? `<div class="mat-seccion">
+        <div class="mat-seccion-title">Del catálogo VSS <span class="text3" style="font-weight:400">(exportable a VSS)</span></div>
+        <div class="fgrid">
+          <div class="fg full"><label>Componente</label>
+            <select id="mat-comp">
+              <option value="">-- seleccionar --</option>
+              ${DB.catalogoVSS.map(c =>
+                `<option value="${c.id}">${esc((c.codigo?c.codigo+' — ':'')+c.nombre)}${c.unidad?' ('+c.unidad+')':''}</option>`
+              ).join('')}
+            </select>
+          </div>
+          <div class="fg"><label>Cantidad</label><input id="mat-cant" type="number" min="0" step="any" placeholder="0"></div>
+          <div class="fg"><label>Notas</label><input id="mat-notas" placeholder="Observaciones..."></div>
+        </div>
       </div>`
-    : `<div class="alert alert-warn" style="margin-bottom:10px">No hay catálogo VSS importado. Podés importarlo en la sección Backup.</div>
-       <div class="fg"><label>Nombre del componente</label>
-         <input id="mat-libre" placeholder="Nombre del componente...">
-       </div>`;
+    : `<div class="alert alert-info" style="margin-bottom:12px">Sin catálogo VSS. Importalo en Backup para usar esta sección.</div>`;
 
-  abrirModal('Agregar material',
-    `${selectorCat}
-     <div class="fgrid">
-       <div class="fg"><label>Cantidad usada *</label><input id="mat-cant" type="number" min="0" step="any" placeholder="0"></div>
-       <div class="fg"><label>Costo unit. manual $<span class="text3" style="font-weight:400"> (opcional — sobreescribe catálogo)</span></label><input id="mat-costo" type="number" min="0" step="any" placeholder="Dejar vacío para usar catálogo"></div>
-       <div class="fg full"><label>Notas</label><input id="mat-notas" placeholder="Observaciones..."></div>
-     </div>`,
+  const secManual = `<div class="mat-seccion">
+      <div class="mat-seccion-title">Material manual <span class="text3" style="font-weight:400">(no exportable a VSS)</span></div>
+      <div class="fgrid">
+        <div class="fg full"><label>Nombre</label><input id="mat-libre" placeholder="Nombre del material..."></div>
+        <div class="fg"><label>Cantidad</label><input id="mat-cant-m" type="number" min="0" step="any" placeholder="0"></div>
+        <div class="fg"><label>Costo unitario $</label><input id="mat-costo-m" type="number" min="0" step="any" placeholder="0"></div>
+        <div class="fg full"><label>Notas</label><input id="mat-notas-m" placeholder="Observaciones..."></div>
+      </div>
+    </div>`;
+
+  abrirModal('Agregar materiales',
+    `${secCatalogo}<div class="mat-sep"></div>${secManual}`,
     `<button class="btn" onclick="cerrarModal()">Cancelar</button>
      <button class="btn btn-p" onclick="guardarMaterial(${proyId})">Agregar</button>`
   );
@@ -792,24 +798,37 @@ function modalNuevoMaterial(proyId){
 function guardarMaterial(proyId){
   const p = DB.proyectosHA.find(x => x.id === proyId);
   if(!p) return;
+  if(!p.materiales) p.materiales = [];
 
+  let agregados = 0;
+
+  // Sección catálogo
   const compIdRaw = document.getElementById('mat-comp') ? document.getElementById('mat-comp').value : '';
   const compId    = compIdRaw ? parseInt(compIdRaw) : null;
-  const libre     = document.getElementById('mat-libre') ? (document.getElementById('mat-libre').value||'').trim() : '';
-  const cant       = parseFloat(document.getElementById('mat-cant').value);
-  const costoRaw   = document.getElementById('mat-costo') ? document.getElementById('mat-costo').value : '';
-  const costoManual= costoRaw !== '' && costoRaw != null ? parseFloat(costoRaw) : null;
-  const notas      = (document.getElementById('mat-notas').value||'').trim();
+  const cantCat   = parseFloat(document.getElementById('mat-cant') ? document.getElementById('mat-cant').value : '');
+  const notasCat  = document.getElementById('mat-notas') ? (document.getElementById('mat-notas').value||'').trim() : '';
+  if(compId){
+    if(!cantCat || cantCat <= 0){ alert('Ingresá una cantidad para el componente del catálogo.'); return; }
+    p.materiales.push({ compId, cant: cantCat, notas: notasCat });
+    agregados++;
+  }
 
-  if(!compId && !libre){ alert('Seleccioná un componente o ingresá un nombre.'); return; }
-  if(!cant || cant <= 0){ alert('Ingresá una cantidad válida.'); return; }
+  // Sección manual
+  const libre    = document.getElementById('mat-libre') ? (document.getElementById('mat-libre').value||'').trim() : '';
+  const cantMan  = parseFloat(document.getElementById('mat-cant-m') ? document.getElementById('mat-cant-m').value : '');
+  const costoRaw = document.getElementById('mat-costo-m') ? document.getElementById('mat-costo-m').value : '';
+  const costoMan = costoRaw !== '' ? parseFloat(costoRaw) : null;
+  const notasMan = document.getElementById('mat-notas-m') ? (document.getElementById('mat-notas-m').value||'').trim() : '';
+  if(libre){
+    if(!cantMan || cantMan <= 0){ alert('Ingresá una cantidad para el material manual.'); return; }
+    const mat = { nombreLibre: libre, cant: cantMan, notas: notasMan };
+    if(costoMan != null && !isNaN(costoMan)) mat.costoManual = costoMan;
+    p.materiales.push(mat);
+    agregados++;
+  }
 
-  if(!p.materiales) p.materiales = [];
-  const mat = { cant, notas };
-  if(compId)        mat.compId = compId;
-  else              mat.nombreLibre = libre;
-  if(costoManual != null && !isNaN(costoManual)) mat.costoManual = costoManual;
-  p.materiales.push(mat);
+  if(!agregados){ alert('Completá al menos una sección.'); return; }
+
   save();
   cerrarModal();
   const cont = document.getElementById('ficha-mats');
