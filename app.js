@@ -301,11 +301,11 @@ function renderFicha(id){
     <div class="ficha-meta">
       ${pill(p.estado)}
       ${p.categoria ? `<span class="text3" style="font-size:11px">• ${esc(p.categoria)}</span>` : ''}
-      ${p.rubro ? `<span class="text3" style="font-size:11px">• Rubro: ${esc(p.rubro)}</span>` : ''}
       ${p.fechaInicio ? `<span class="text3" style="font-size:11px">• Inicio: ${fmtFecha(p.fechaInicio)}</span>` : ''}
       ${p.fechaEstFin ? `<span class="text3" style="font-size:11px">• Est. fin: ${fmtFecha(p.fechaEstFin)}</span>` : ''}
       ${p.fechaFinReal ? `<span class="green" style="font-size:11px">• Finalizado: ${fmtFecha(p.fechaFinReal)}</span>` : ''}
     </div>
+    ${p.rubro ? `<div style="font-size:12px;color:var(--primary-light);margin-top:4px;font-weight:600">Rubro: ${esc(p.rubro)}</div>` : ''}
     ${p.objetivo ? `<div class="ficha-obj">${esc(p.objetivo)}</div>` : ''}
     ${p.descripcion ? `<div class="ficha-desc">${esc(p.descripcion)}</div>` : ''}
   </div>
