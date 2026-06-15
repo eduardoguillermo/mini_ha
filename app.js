@@ -1077,7 +1077,12 @@ function mostrarSplash(){
       <div style="margin-bottom:2.5rem;text-align:center;">
         <div style="font-size:20px;font-weight:300;letter-spacing:0.03em;color:#c8d8e0;line-height:1.4;">Sistema de gestión de mini proyectos</div>
       </div>
-      <div style="border-top:0.5px solid rgba(255,255,255,0.08);padding-top:1rem;text-align:center;width:100%;max-width:400px;">
+      <div style="width:100%;max-width:400px;margin-bottom:1.5rem;">
+        <div style="position:relative;height:5px;background:#0a0c0f;border-radius:3px;">
+          <div id="splash-bar" style="height:100%;width:0%;background:#00838f;border-radius:3px;transition:width 5s linear;"></div>
+        </div>
+      </div>
+      <div style="text-align:center;width:100%;max-width:400px;">
         <div style="display:flex;align-items:center;justify-content:center;gap:1rem;font-size:10px;color:#5a7a85;font-family:monospace;letter-spacing:0.05em;">
           <span style="color:#7a9aa8;">Mini HA</span>
           <span style="opacity:0.3;">·</span>
@@ -1088,9 +1093,6 @@ function mostrarSplash(){
           <span>${VERSION}</span>
         </div>
       </div>
-    </div>
-    <div style="position:relative;height:5px;background:#0a0c0f;">
-      <div id="splash-bar" style="height:100%;width:0%;background:#00838f;transition:width 5s linear;"></div>
     </div>
   `;
   document.body.appendChild(el);
