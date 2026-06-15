@@ -1095,11 +1095,10 @@ function mostrarSplash(){
   `;
   document.body.appendChild(el);
 
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      document.getElementById('splash-bar').style.width = '100%';
-    });
-  });
+  setTimeout(() => {
+    const bar = document.getElementById('splash-bar');
+    if(bar) bar.style.width = '100%';
+  }, 50);
 
   setTimeout(() => {
     el.style.transition = 'opacity 0.4s ease';
