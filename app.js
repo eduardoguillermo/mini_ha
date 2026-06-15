@@ -17,6 +17,7 @@ const ESTADO_PILL = {
 let DB = {
   nid: 1,
   proyectosHA: [],
+  catalogoVSS: [],   // componentes importados desde VSS Logística
   config: {
     categorias: ['Automatización','Hardware','Mantenimiento','Integración','Bug fix','Dashboard','Red','Otro'],
     empresa: 'Casa HA'
@@ -29,6 +30,7 @@ function load(){
     if(raw) DB = JSON.parse(raw);
     if(!DB.nid)         DB.nid = 1;
     if(!DB.proyectosHA) DB.proyectosHA = [];
+    if(!DB.catalogoVSS) DB.catalogoVSS = [];
     if(!DB.config)      DB.config = {};
     if(!DB.config.categorias)  DB.config.categorias = ['Automatización','Hardware','Mantenimiento','Integración','Bug fix','Dashboard','Red','Otro'];
     if(!DB.config.empresa)     DB.config.empresa = 'Casa HA';
@@ -303,7 +305,21 @@ function renderFicha(id){
     </div>
   </div>`;
 
-  // Dispositivos
+  // Materiales
+  const tieneMats = p.materiales && p.materiales.length;
+  const tieneMatsCat = tieneMats && p.materiales.some(m => m.compId);
+  html += `<div class="card">
+    <div class="ch">
+      <span class="ct">Materiales usados</span>
+      <div style="display:flex;gap:6px">
+        ${tieneMatsCat ? `<button class="btn btn-sm btn-g" onclick="exportarSalidasVSS(${p.id})">⬇️ Exportar salidas VSS</button>` : ''}
+        <button class="btn btn-sm btn-p" onclick="modalNuevoMaterial(${p.id})">+ Agregar</button>
+      </div>
+    </div>
+    <div class="card-body" id="ficha-mats">
+      ${renderMateriales(p)}
+    </div>
+  </div>`;
   if(p.dispositivos && p.dispositivos.trim()){
     html += `<div class="card">
       <div class="ch"><span class="ct">Dispositivos involucrados</span></div>
@@ -648,26 +664,6 @@ function guardarConfig(){
 }
 
 // ── BACKUP ────────────────────────────────────────────────────────────────────
-function renderBackup(){
-  document.getElementById('pacts').innerHTML = '';
-  const html = `<div class="card">
-    <div class="ch"><span class="ct">Exportar</span></div>
-    <div class="card-body">
-      <p class="text2" style="font-size:12px;margin-bottom:12px">Descargá un archivo JSON con todos los datos.</p>
-      <button class="btn btn-p" onclick="exportarBackup()">⬇️ Exportar JSON</button>
-    </div>
-  </div>
-  <div class="card">
-    <div class="ch"><span class="ct">Importar</span></div>
-    <div class="card-body">
-      <p class="text2" style="font-size:12px;margin-bottom:12px">Restaurar desde un backup JSON. <strong class="red">Reemplaza todos los datos actuales.</strong></p>
-      <input type="file" id="bk-file" accept=".json" style="display:none" onchange="importarBackup(event)">
-      <button class="btn btn-d" onclick="document.getElementById('bk-file').click()">⬆️ Importar JSON</button>
-    </div>
-  </div>`;
-  document.getElementById('content').innerHTML = html;
-}
-
 function exportarBackup(){
   const blob = new Blob([JSON.stringify(DB, null, 2)], {type:'application/json'});
   const a = document.createElement('a');
@@ -694,6 +690,191 @@ function importarBackup(ev){
     }
   };
   reader.readAsText(file);
+}
+
+// ── MATERIALES EN SUBPROYECTO ─────────────────────────────────────────────────
+function renderMateriales(p){
+  if(!p.materiales || !p.materiales.length){
+    return `<div class="empty" style="padding:16px">Sin materiales registrados.</div>`;
+  }
+  return `<table>
+    <thead><tr>
+      <th>Componente</th><th>Cant. usada</th><th>Notas</th><th></th>
+    </tr></thead>
+    <tbody>${p.materiales.map((m,i) => {
+      const comp = DB.catalogoVSS.find(c => c.id === m.compId);
+      const nombre = comp ? `${comp.codigo ? comp.codigo+' — ' : ''}${comp.nombre}` : (m.nombreLibre||'(sin catálogo)');
+      return `<tr>
+        <td style="font-size:12px">${esc(nombre)}</td>
+        <td style="font-size:12px">${m.cant} ${comp?esc(comp.unidad||''):''}</td>
+        <td style="font-size:11px;color:var(--text2)">${esc(m.notas||'')}</td>
+        <td>
+          <button class="btn btn-sm btn-d" onclick="eliminarMaterial(${p.id},${i})">✕</button>
+        </td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table>`;
+}
+
+function modalNuevoMaterial(proyId){
+  const p = DB.proyectosHA.find(x => x.id === proyId);
+  if(!p) return;
+
+  const tieneCatalogo = DB.catalogoVSS.length > 0;
+  const selectorCat = tieneCatalogo
+    ? `<div class="fg"><label>Componente del catálogo VSS</label>
+        <select id="mat-comp">
+          <option value="">-- seleccionar --</option>
+          ${DB.catalogoVSS.map(c =>
+            `<option value="${c.id}">${esc((c.codigo?c.codigo+' — ':'')+c.nombre)}${c.unidad?' ('+c.unidad+')':''}</option>`
+          ).join('')}
+        </select>
+      </div>
+      <div class="fg"><label>O nombre libre (si no está en catálogo)</label>
+        <input id="mat-libre" placeholder="Nombre del componente...">
+      </div>`
+    : `<div class="alert alert-warn" style="margin-bottom:10px">No hay catálogo VSS importado. Podés importarlo en la sección Backup.</div>
+       <div class="fg"><label>Nombre del componente</label>
+         <input id="mat-libre" placeholder="Nombre del componente...">
+       </div>`;
+
+  abrirModal('Agregar material',
+    `${selectorCat}
+     <div class="fgrid">
+       <div class="fg"><label>Cantidad usada *</label><input id="mat-cant" type="number" min="0" step="any" placeholder="0"></div>
+       <div class="fg"><label>Notas</label><input id="mat-notas" placeholder="Observaciones..."></div>
+     </div>`,
+    `<button class="btn" onclick="cerrarModal()">Cancelar</button>
+     <button class="btn btn-p" onclick="guardarMaterial(${proyId})">Agregar</button>`
+  );
+}
+
+function guardarMaterial(proyId){
+  const p = DB.proyectosHA.find(x => x.id === proyId);
+  if(!p) return;
+
+  const compIdRaw = document.getElementById('mat-comp') ? document.getElementById('mat-comp').value : '';
+  const compId    = compIdRaw ? parseInt(compIdRaw) : null;
+  const libre     = document.getElementById('mat-libre') ? (document.getElementById('mat-libre').value||'').trim() : '';
+  const cant      = parseFloat(document.getElementById('mat-cant').value);
+  const notas     = (document.getElementById('mat-notas').value||'').trim();
+
+  if(!compId && !libre){ alert('Seleccioná un componente o ingresá un nombre.'); return; }
+  if(!cant || cant <= 0){ alert('Ingresá una cantidad válida.'); return; }
+
+  if(!p.materiales) p.materiales = [];
+  const mat = { cant, notas };
+  if(compId)      mat.compId = compId;
+  else            mat.nombreLibre = libre;
+  p.materiales.push(mat);
+  save();
+  cerrarModal();
+  const cont = document.getElementById('ficha-mats');
+  if(cont) cont.innerHTML = renderMateriales(p);
+}
+
+function eliminarMaterial(proyId, idx){
+  const p = DB.proyectosHA.find(x => x.id === proyId);
+  if(!p || !p.materiales) return;
+  if(!confirm('¿Eliminar este material?')) return;
+  p.materiales.splice(idx, 1);
+  save();
+  const cont = document.getElementById('ficha-mats');
+  if(cont) cont.innerHTML = renderMateriales(p);
+}
+
+function exportarSalidasVSS(proyId){
+  const p = DB.proyectosHA.find(x => x.id === proyId);
+  if(!p) return;
+  const mats = (p.materiales||[]).filter(m => m.compId);
+  if(!mats.length){
+    alert('No hay materiales con componentes del catálogo VSS para exportar.');
+    return;
+  }
+  // Formato compatible con movimientos[] de VSS Logística
+  const salidas = mats.map((m, i) => ({
+    id:        900000 + i,   // ID temporal — VSS lo reemplaza al importar
+    cid:       m.compId,
+    tipo:      'Salida',
+    cant:      m.cant,
+    fecha:     p.fechaFinReal || today(),
+    nota:      (m.notas ? m.notas + ' — ' : '') + 'Mini HA: ' + p.numero + ' ' + p.titulo,
+    estadoMat: 'N'
+  }));
+  const blob = new Blob([JSON.stringify({ salidas, proyecto: p.numero, titulo: p.titulo }, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'salidas-vss-'+p.numero+'-'+today()+'.json';
+  a.click();
+}
+
+// ── CATÁLOGO VSS — IMPORTAR ───────────────────────────────────────────────────
+function importarCatalogoVSS(ev){
+  const file = ev.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      const data = JSON.parse(e.target.result);
+      // Acepta tanto el backup completo de VSS como solo el array de componentes
+      const comps = data.componentes || (Array.isArray(data) ? data : null);
+      if(!comps || !comps.length) throw new Error('No se encontraron componentes en el archivo.');
+      DB.catalogoVSS = comps.map(c => ({
+        id:     c.id,
+        codigo: c.codigo||'',
+        nombre: c.nombre||'',
+        unidad: c.unidad||'',
+        costo:  c.costo||0
+      }));
+      save();
+      alert(`Catálogo importado: ${DB.catalogoVSS.length} componentes.`);
+      renderBackup();
+    } catch(err){
+      alert('Error al importar catálogo: '+err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+// ── BACKUP ────────────────────────────────────────────────────────────────────
+function renderBackup(){
+  document.getElementById('pacts').innerHTML = '';
+  const catInfo = DB.catalogoVSS.length
+    ? `<span class="green">${DB.catalogoVSS.length} componentes cargados</span>`
+    : `<span class="amber">Sin catálogo importado</span>`;
+  const html = `<div class="card">
+    <div class="ch"><span class="ct">Catálogo VSS Logística</span></div>
+    <div class="card-body">
+      <p class="text2" style="font-size:12px;margin-bottom:8px">Estado: ${catInfo}</p>
+      <p class="text2" style="font-size:11px;margin-bottom:12px">Exportá el backup JSON desde VSS Logística e importalo acá para tener el catálogo disponible al cargar materiales.</p>
+      <input type="file" id="cat-file" accept=".json" style="display:none" onchange="importarCatalogoVSS(event)">
+      <button class="btn btn-p" onclick="document.getElementById('cat-file').click()">⬆️ Importar catálogo VSS</button>
+      ${DB.catalogoVSS.length ? `<button class="btn btn-d" onclick="limpiarCatalogo()" style="margin-left:8px">🗑️ Limpiar catálogo</button>` : ''}
+    </div>
+  </div>
+  <div class="card">
+    <div class="ch"><span class="ct">Backup Mini HA</span></div>
+    <div class="card-body">
+      <p class="text2" style="font-size:12px;margin-bottom:12px">Exportá o restaurá todos los datos de Mini HA.</p>
+      <button class="btn btn-p" onclick="exportarBackup()">⬇️ Exportar JSON</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ch"><span class="ct">Restaurar</span></div>
+    <div class="card-body">
+      <p class="text2" style="font-size:12px;margin-bottom:12px"><strong class="red">Reemplaza todos los datos actuales.</strong></p>
+      <input type="file" id="bk-file" accept=".json" style="display:none" onchange="importarBackup(event)">
+      <button class="btn btn-d" onclick="document.getElementById('bk-file').click()">⬆️ Restaurar backup</button>
+    </div>
+  </div>`;
+  document.getElementById('content').innerHTML = html;
+}
+
+function limpiarCatalogo(){
+  if(!confirm('¿Limpiar el catálogo VSS? No afecta los materiales ya registrados.')) return;
+  DB.catalogoVSS = [];
+  save();
+  renderBackup();
 }
 
 // ── MODAL ─────────────────────────────────────────────────────────────────────
