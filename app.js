@@ -1089,7 +1089,7 @@ function mostrarSplash(){
         </div>
       </div>
     </div>
-    <div style="position:relative;height:3px;background:rgba(255,255,255,0.06);">
+    <div style="position:relative;height:5px;background:#0a0c0f;">
       <div id="splash-bar" style="height:100%;width:0%;background:#00838f;transition:width 5s linear;"></div>
     </div>
   `;
