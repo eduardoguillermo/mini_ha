@@ -152,11 +152,11 @@ function renderDashboard(){
     <div class="stat"><div class="stat-n amber">${pausados.length}</div><div class="stat-l">Pausados</div></div>
     <div class="stat"><div class="stat-n green">${finalizados.length}</div><div class="stat-l">Finalizados</div></div>
   </div>
-  ${costoTotal ? `<div class="stats">
+  <div class="stats">
     <div class="stat"><div class="stat-n" style="color:var(--primary-light)">${fmtPesos(costoTotal)}</div><div class="stat-l">Costo total</div></div>
-    ${costoActivos ? `<div class="stat"><div class="stat-n amber">${fmtPesos(costoActivos)}</div><div class="stat-l">En curso</div></div>` : ''}
-    ${costoFin ? `<div class="stat"><div class="stat-n green">${fmtPesos(costoFin)}</div><div class="stat-l">Finalizados</div></div>` : ''}
-  </div>` : ''}`;
+    <div class="stat"><div class="stat-n amber">${fmtPesos(costoActivos)}</div><div class="stat-l">En curso</div></div>
+    <div class="stat"><div class="stat-n green">${fmtPesos(costoFin)}</div><div class="stat-l">Finalizados</div></div>
+  </div>`;
 
   if(activos.length){
     html += `<div class="card">
