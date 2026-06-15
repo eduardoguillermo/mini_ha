@@ -35,6 +35,7 @@ function load(){
     if(!DB.config.categorias)  DB.config.categorias = ['Automatización','Hardware','Mantenimiento','Integración','Bug fix','Dashboard','Red','Otro'];
     if(!DB.config.empresa)     DB.config.empresa = 'Casa HA';
     if(!DB.config.materialesManual) DB.config.materialesManual = [];
+    if(!DB.config.rubros)          DB.config.rubros = [];
     if(!DB.config.plantillas)  DB.config.plantillas = [
       'Editar configuration.yaml',
       'Reiniciar Home Assistant',
@@ -297,6 +298,7 @@ function renderFicha(id){
     <div class="ficha-meta">
       ${pill(p.estado)}
       ${p.categoria ? `<span class="text3" style="font-size:11px">• ${esc(p.categoria)}</span>` : ''}
+      ${p.rubro ? `<span class="text3" style="font-size:11px">• Rubro: ${esc(p.rubro)}</span>` : ''}
       ${p.fechaInicio ? `<span class="text3" style="font-size:11px">• Inicio: ${fmtFecha(p.fechaInicio)}</span>` : ''}
       ${p.fechaEstFin ? `<span class="text3" style="font-size:11px">• Est. fin: ${fmtFecha(p.fechaEstFin)}</span>` : ''}
       ${p.fechaFinReal ? `<span class="green" style="font-size:11px">• Finalizado: ${fmtFecha(p.fechaFinReal)}</span>` : ''}
@@ -526,9 +528,13 @@ function formProy(p){
   const cats = DB.config.categorias.map(c =>
     `<option value="${esc(c)}" ${p&&p.categoria===c?'selected':''}>${esc(c)}</option>`
   ).join('');
+  const rubs = (DB.config.rubros||[]).map(r =>
+    `<option value="${esc(r)}" ${p&&p.rubro===r?'selected':''}>${esc(r)}</option>`
+  ).join('');
   return `<div class="fgrid">
     <div class="fg"><label>Título *</label><input id="pf-titulo" value="${esc(p?p.titulo:'')}" placeholder="Nombre del subproyecto"></div>
     <div class="fg"><label>Categoría</label><select id="pf-cat"><option value="">-- sin categoría --</option>${cats}</select></div>
+    <div class="fg"><label>Rubro HA</label><select id="pf-rubro"><option value="">-- sin rubro --</option>${rubs}</select></div>
     <div class="fg full"><label>Objetivo</label><input id="pf-objetivo" value="${esc(p?p.objetivo:'')}" placeholder="Qué se quiere lograr"></div>
     <div class="fg full"><label>Descripción / Contexto</label><textarea id="pf-desc" rows="3" placeholder="Detalles, contexto técnico, notas...">${esc(p?p.descripcion:'')}</textarea></div>
     <div class="fg"><label>Fecha inicio</label><input id="pf-finicio" type="date" value="${p?p.fechaInicio||'':''}"></div>
@@ -555,6 +561,7 @@ function guardarNuevoProy(){
     objetivo:    document.getElementById('pf-objetivo').value.trim(),
     descripcion: document.getElementById('pf-desc').value.trim(),
     categoria:   document.getElementById('pf-cat').value,
+    rubro:       document.getElementById('pf-rubro').value,
     estado:      'Planificado',
     fechaInicio: document.getElementById('pf-finicio').value,
     fechaEstFin: document.getElementById('pf-festfin').value,
@@ -589,6 +596,7 @@ function guardarEditarProy(id){
   p.objetivo     = document.getElementById('pf-objetivo').value.trim();
   p.descripcion  = document.getElementById('pf-desc').value.trim();
   p.categoria    = document.getElementById('pf-cat').value;
+  p.rubro        = document.getElementById('pf-rubro').value;
   p.fechaInicio  = document.getElementById('pf-finicio').value;
   p.fechaEstFin  = document.getElementById('pf-festfin').value;
   p.dispositivos = document.getElementById('pf-dispositivos').value.trim();
@@ -646,6 +654,7 @@ function renderConfig(){
   const cats = (DB.config.categorias||[]).join('\n');
   const pls  = (DB.config.plantillas||[]).join('\n');
   const mans = (DB.config.materialesManual||[]).join('\n');
+  const rubs = (DB.config.rubros||[]).join('\n');
   const html = `<div class="card">
     <div class="ch"><span class="ct">Categorías de subproyecto</span></div>
     <div class="card-body">
@@ -661,6 +670,13 @@ function renderConfig(){
       <div class="fg">
         <textarea id="cfg-pls" rows="8" style="font-family:monospace">${esc(pls)}</textarea>
       </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ch"><span class="ct">Rubros HA</span></div>
+    <div class="card-body">
+      <p class="text2" style="font-size:11px;margin-bottom:8px">Clasificación de automatizaciones. Una por línea.</p>
+      <div class="fg"><textarea id="cfg-rubs" rows="6" style="font-family:monospace">${esc(rubs)}</textarea></div>
     </div>
   </div>
   <div class="card">
@@ -684,7 +700,10 @@ function guardarConfig(){
   if(!cats.length){ alert('Necesitás al menos una categoría.'); return; }
   const mans = (document.getElementById('cfg-mans').value||'')
     .split('\n').map(s=>s.trim()).filter(Boolean);
-  DB.config.categorias      = cats;
+  const rubs2 = (document.getElementById('cfg-rubs').value||'')
+    .split('\n').map(s=>s.trim()).filter(Boolean);
+  DB.config.rubros           = rubs2;
+  DB.config.categorias       = cats;
   DB.config.plantillas      = pls;
   DB.config.materialesManual = mans;
   save();
