@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mini HA</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav" id="nav">
+  <div class="nav-logo">
+    <div class="logo-icon">🏠</div>
+    <div>
+      <div class="logo-text">Mini HA</div>
+      <div class="logo-sub">Home Assistant</div>
+    </div>
+  </div>
+  <div class="nav-section">
+    <div class="nav-section-title">Principal</div>
+    <a onclick="goTo('dashboard')" id="nav-dashboard">📊 Dashboard</a>
+    <a onclick="goTo('proyectos')" id="nav-proyectos">📁 Subproyectos</a>
+  </div>
+  <div class="nav-section">
+    <div class="nav-section-title">Sistema</div>
+    <a onclick="goTo('config')" id="nav-config">⚙️ Configuración</a>
+    <a onclick="goTo('backup')" id="nav-backup">💾 Backup</a>
+  </div>
+</nav>
+
+<!-- MAIN -->
+<div class="main">
+  <div class="topbar">
+    <div class="ptitle" id="ptitle">Dashboard</div>
+    <div class="pacts" id="pacts"></div>
+  </div>
+  <div class="content" id="content"></div>
+</div>
+
+<!-- MODAL -->
+<div class="moverlay" id="modal" style="display:none" onclick="if(event.target===this)cerrarModal()">
+  <div class="modal">
+    <div class="mhead">
+      <h3 id="modal-title"></h3>
+      <button class="btn btn-sm" onclick="cerrarModal()">✕</button>
+    </div>
+    <div class="mbody" id="modal-body"></div>
+    <div class="mfoot" id="modal-foot"></div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
