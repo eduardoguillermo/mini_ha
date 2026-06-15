@@ -960,6 +960,13 @@ function renderBackup(){
     </div>
   </div>
   <div class="card">
+    <div class="ch"><span class="ct">Caché y Service Worker</span></div>
+    <div class="card-body">
+      <p class="text2" style="font-size:12px;margin-bottom:12px">Si la app no refleja los últimos cambios, limpiá el caché y recargá.</p>
+      <button class="btn btn-d" onclick="limpiarCache()">🔄 Limpiar caché y recargar</button>
+    </div>
+  </div>
+  <div class="card">
     <div class="ch"><span class="ct">Restaurar</span></div>
     <div class="card-body">
       <p class="text2" style="font-size:12px;margin-bottom:12px"><strong class="red">Reemplaza todos los datos actuales.</strong></p>
@@ -987,6 +994,15 @@ function abrirModal(title, body, foot){
 
 function cerrarModal(){
   document.getElementById('modal').style.display = 'none';
+}
+
+// ── CACHE ─────────────────────────────────────────────────────────────────────
+function limpiarCache(){
+  if(!confirm('¿Limpiar caché y recargar la app?')) return;
+  Promise.all([
+    navigator.serviceWorker ? navigator.serviceWorker.getRegistrations().then(rs => Promise.all(rs.map(r => r.unregister()))) : Promise.resolve(),
+    caches ? caches.keys().then(ks => Promise.all(ks.map(k => caches.delete(k)))) : Promise.resolve()
+  ]).then(() => location.reload(true));
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
