@@ -92,7 +92,7 @@ function agregarHistorial(proy, accion){
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 // ── NAVEGACIÓN ────────────────────────────────────────────────────────────────
-const PANELS = ['dashboard','proyectos','proy-ficha','config','backup'];
+const PANELS = ['dashboard','proyectos','proy-ficha','reportes','config','backup'];
 let _panel = 'dashboard';
 let _proyActual = null; // id del subproyecto abierto
 
@@ -110,6 +110,7 @@ function goTo(panel, extra){
     'dashboard':  'Dashboard',
     'proyectos':  'Subproyectos',
     'proy-ficha': 'Subproyecto',
+    'reportes':   'Reportes',
     'config':     'Configuración',
     'backup':     'Backup / Restaurar'
   };
@@ -119,6 +120,7 @@ function goTo(panel, extra){
     'dashboard':  renderDashboard,
     'proyectos':  renderProyectos,
     'proy-ficha': () => renderFicha(_proyActual),
+    'reportes':   renderReportes,
     'config':     renderConfig,
     'backup':     renderBackup
   };
@@ -977,6 +979,139 @@ function importarCatalogoVSS(ev){
     }
   };
   reader.readAsText(file);
+}
+
+// ── REPORTES ──────────────────────────────────────────────────────────────────
+function renderReportes(){
+  const pacts = document.getElementById('pacts');
+  pacts.innerHTML = `<button class="btn btn-sm" onclick="exportarReporteCSV()">⬇ Exportar CSV</button>`;
+
+  const ps = DB.proyectosHA || [];
+
+  const estados = ['Planificado','En curso','Pausado','Finalizado','Cancelado'];
+  const porEstado = {};
+  estados.forEach(e => porEstado[e] = 0);
+  ps.forEach(p => { if(porEstado[p.estado] !== undefined) porEstado[p.estado]++; });
+
+  const costoTotal = ps.reduce((s,p) => s + costoSubproy(p), 0);
+  const costoEnCurso = ps.filter(p=>p.estado==='En curso').reduce((s,p)=>s+costoSubproy(p),0);
+  const costoFin = ps.filter(p=>p.estado==='Finalizado').reduce((s,p)=>s+costoSubproy(p),0);
+
+  const top5 = [...ps].sort((a,b)=>costoSubproy(b)-costoSubproy(a)).slice(0,5);
+
+  const porCat = {};
+  ps.forEach(p => {
+    const c = p.categoria || 'Sin categoria';
+    if(!porCat[c]) porCat[c] = {cant:0, costo:0};
+    porCat[c].cant++;
+    porCat[c].costo += costoSubproy(p);
+  });
+  const catsSorted = Object.entries(porCat).sort((a,b)=>b[1].cant-a[1].cant);
+
+  const COLOR_ESTADO = {
+    'Planificado':'#5a8fc4',
+    'En curso':   '#00838f',
+    'Pausado':    '#c4955a',
+    'Finalizado': '#4caf7d',
+    'Cancelado':  '#888'
+  };
+
+  const maxEstado = Math.max(...Object.values(porEstado), 1);
+  const barW = 48; const barGap = 18; const chartH = 120;
+  const totalW = estados.length * (barW + barGap);
+  const barsSVG = estados.map((e,i) => {
+    const val = porEstado[e];
+    const h = val === 0 ? 2 : Math.max(4, Math.round((val / maxEstado) * chartH));
+    const x = i * (barW + barGap);
+    const y = chartH - h;
+    return `<g>
+      <rect x="${x}" y="${y}" width="${barW}" height="${h}" rx="3" fill="${COLOR_ESTADO[e]}"/>
+      <text x="${x + barW/2}" y="${y - 5}" text-anchor="middle" font-size="13" font-weight="600" fill="#c8d8e0">${val}</text>
+      <text x="${x + barW/2}" y="${chartH + 16}" text-anchor="middle" font-size="9" fill="#7a9aa8">${e}</text>
+    </g>`;
+  }).join('');
+
+  const filasTop5 = top5.length
+    ? top5.map((p,i) => `<tr>
+        <td style="padding:6px 8px;color:#7a9aa8;font-size:11px;">${i+1}</td>
+        <td style="padding:6px 8px;font-size:12px;color:#c8d8e0;">${esc(p.numero)} -- ${esc(p.titulo)}</td>
+        <td style="padding:6px 8px;font-size:12px;color:#c8d8e0;text-align:right;">${fmtPesos(costoSubproy(p))}</td>
+        <td style="padding:6px 8px;font-size:11px;color:#7a9aa8;">${esc(p.estado)}</td>
+      </tr>`).join('')
+    : `<tr><td colspan="4" style="padding:12px;color:#7a9aa8;font-size:12px;text-align:center;">Sin datos</td></tr>`;
+
+  const filasCat = catsSorted.length
+    ? catsSorted.map(([cat, d]) => `<tr>
+        <td style="padding:6px 8px;font-size:12px;color:#c8d8e0;">${esc(cat)}</td>
+        <td style="padding:6px 8px;font-size:12px;color:#c8d8e0;text-align:center;">${d.cant}</td>
+        <td style="padding:6px 8px;font-size:12px;color:#c8d8e0;text-align:right;">${fmtPesos(d.costo)}</td>
+      </tr>`).join('')
+    : `<tr><td colspan="3" style="padding:12px;color:#7a9aa8;font-size:12px;text-align:center;">Sin datos</td></tr>`;
+
+  const html = `
+  <div class="card">
+    <div class="ch"><span class="ct">Subproyectos por estado</span></div>
+    <div class="card-body">
+      <svg viewBox="0 0 ${totalW} ${chartH + 30}" width="100%" style="max-width:520px;display:block;margin:0 auto;">
+        ${barsSVG}
+      </svg>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ch"><span class="ct">Costos</span></div>
+    <div class="card-body">
+      <div style="display:flex;gap:12px;flex-wrap:wrap;">
+        <div class="stat-box"><div class="stat-label">Total general</div><div class="stat-val">${fmtPesos(costoTotal)}</div></div>
+        <div class="stat-box"><div class="stat-label">En curso</div><div class="stat-val">${fmtPesos(costoEnCurso)}</div></div>
+        <div class="stat-box"><div class="stat-label">Finalizados</div><div class="stat-val">${fmtPesos(costoFin)}</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ch"><span class="ct">Top 5 por costo</span></div>
+    <div class="card-body" style="padding:0">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead><tr style="border-bottom:1px solid var(--border)">
+          <th style="padding:6px 8px;font-size:10px;color:#7a9aa8;font-weight:600;text-align:left;">#</th>
+          <th style="padding:6px 8px;font-size:10px;color:#7a9aa8;font-weight:600;text-align:left;">Subproyecto</th>
+          <th style="padding:6px 8px;font-size:10px;color:#7a9aa8;font-weight:600;text-align:right;">Costo</th>
+          <th style="padding:6px 8px;font-size:10px;color:#7a9aa8;font-weight:600;text-align:left;">Estado</th>
+        </tr></thead>
+        <tbody>${filasTop5}</tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ch"><span class="ct">Por categoria</span></div>
+    <div class="card-body" style="padding:0">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead><tr style="border-bottom:1px solid var(--border)">
+          <th style="padding:6px 8px;font-size:10px;color:#7a9aa8;font-weight:600;text-align:left;">Categoria</th>
+          <th style="padding:6px 8px;font-size:10px;color:#7a9aa8;font-weight:600;text-align:center;">Cantidad</th>
+          <th style="padding:6px 8px;font-size:10px;color:#7a9aa8;font-weight:600;text-align:right;">Costo total</th>
+        </tr></thead>
+        <tbody>${filasCat}</tbody>
+      </table>
+    </div>
+  </div>`;
+
+  document.getElementById('content').innerHTML = html;
+}
+
+function exportarReporteCSV(){
+  const ps = DB.proyectosHA || [];
+  const cols = ['Numero','Titulo','Estado','Categoria','Rubro','Costo','FechaInicio','FechaEstFin','FechaFinReal','Dispositivos'];
+  const rows = ps.map(p => [
+    p.numero, p.titulo, p.estado, p.categoria||'', p.rubro||'',
+    costoSubproy(p), p.fechaInicio||'', p.fechaEstFin||'', p.fechaFinReal||'',
+    p.dispositivos||''
+  ].map(v => `"${String(v).replace(/"/g,'""')}"`).join(','));
+  const csv = [cols.join(','), ...rows].join('\r\n');
+  const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `mini-ha-reporte-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
 }
 
 // ── BACKUP ────────────────────────────────────────────────────────────────────
