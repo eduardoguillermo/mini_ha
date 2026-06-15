@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mini HA</title>
 <link rel="stylesheet" href="style.css">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#00838f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Mini HA">
 </head>
 <body>
 
@@ -51,5 +57,12 @@
 </div>
 
 <script src="app.js"></script>
+<script>
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('/mini_ha/sw.js')
+    .then(r => console.log('SW registrado:', r.scope))
+    .catch(e => console.error('SW error:', e));
+}
+</script>
 </body>
 </html>
