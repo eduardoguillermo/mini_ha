@@ -2,7 +2,7 @@
 
 // ── CONSTANTES ────────────────────────────────────────────────────────────────
 const SKEY = 'mini-ha';
-const VERSION = '1.0.0';
+const VERSION = 'v1.01';
 
 const ESTADOS_PROY = ['Planificado','En curso','Pausado','Finalizado','Cancelado'];
 const ESTADO_PILL = {
@@ -1048,8 +1048,69 @@ function limpiarCache(){
   ]).then(() => location.reload(true));
 }
 
+// ── SPLASH ────────────────────────────────────────────────────────────────────
+function mostrarSplash(){
+  const ahora = new Date();
+  const diasSemana = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+  const meses = ['01','02','03','04','05','06','07','08','09','10','11','12'];
+  const dia = diasSemana[ahora.getDay()];
+  const fecha = `${dia} ${String(ahora.getDate()).padStart(2,'0')}/${meses[ahora.getMonth()]}/${ahora.getFullYear()}`;
+  const hora = `${String(ahora.getHours()).padStart(2,'0')}:${String(ahora.getMinutes()).padStart(2,'0')}`;
+
+  const el = document.createElement('div');
+  el.id = 'splash';
+  el.style.cssText = `
+    position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;
+    background:#111318;
+    display:flex;flex-direction:column;
+    font-family:system-ui,sans-serif;
+  `;
+  el.innerHTML = `
+    <div style="background:#1e2128;border-bottom:1px solid rgba(255,255,255,0.08);padding:10px 18px;display:flex;align-items:center;gap:10px;">
+      <div style="width:32px;height:32px;background:#00838f;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">🏠</div>
+      <div>
+        <div style="font-weight:700;font-size:13px;color:#e0e0e0;">Mini HA</div>
+        <div style="font-size:10px;color:#7a9aa8;">Home Assistant</div>
+      </div>
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:3rem 2rem;">
+      <div style="margin-bottom:2.5rem;text-align:center;">
+        <div style="font-size:20px;font-weight:300;letter-spacing:0.03em;color:#c8d8e0;line-height:1.4;">Sistema de gestión de mini proyectos</div>
+      </div>
+      <div style="border-top:0.5px solid rgba(255,255,255,0.08);padding-top:1rem;text-align:center;width:100%;max-width:400px;">
+        <div style="display:flex;align-items:center;justify-content:center;gap:1rem;font-size:10px;color:#5a7a85;font-family:monospace;letter-spacing:0.05em;">
+          <span style="color:#7a9aa8;">Mini HA</span>
+          <span style="opacity:0.3;">·</span>
+          <span>${fecha}</span>
+          <span style="opacity:0.3;">·</span>
+          <span>${hora}</span>
+          <span style="opacity:0.3;">·</span>
+          <span>${VERSION}</span>
+        </div>
+      </div>
+    </div>
+    <div style="position:relative;height:3px;background:rgba(255,255,255,0.06);">
+      <div id="splash-bar" style="height:100%;width:0%;background:#00838f;transition:width 5s linear;"></div>
+    </div>
+  `;
+  document.body.appendChild(el);
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      document.getElementById('splash-bar').style.width = '100%';
+    });
+  });
+
+  setTimeout(() => {
+    el.style.transition = 'opacity 0.4s ease';
+    el.style.opacity = '0';
+    setTimeout(() => el.remove(), 400);
+  }, 5000);
+}
+
 // ── INIT ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', function(){
+  mostrarSplash();
   load();
   goTo('dashboard');
 });
