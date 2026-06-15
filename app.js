@@ -30,8 +30,17 @@ function load(){
     if(!DB.nid)         DB.nid = 1;
     if(!DB.proyectosHA) DB.proyectosHA = [];
     if(!DB.config)      DB.config = {};
-    if(!DB.config.categorias) DB.config.categorias = ['Automatización','Hardware','Mantenimiento','Integración','Bug fix','Dashboard','Red','Otro'];
-    if(!DB.config.empresa)    DB.config.empresa = 'Casa HA';
+    if(!DB.config.categorias)  DB.config.categorias = ['Automatización','Hardware','Mantenimiento','Integración','Bug fix','Dashboard','Red','Otro'];
+    if(!DB.config.empresa)     DB.config.empresa = 'Casa HA';
+    if(!DB.config.plantillas)  DB.config.plantillas = [
+      'Editar configuration.yaml',
+      'Reiniciar Home Assistant',
+      'Probar automatización',
+      'Verificar logs',
+      'Hacer backup de HA',
+      'Actualizar integración',
+      'Documentar cambio'
+    ];
   } catch(e){ console.error('Error load:', e); }
 }
 
@@ -399,21 +408,50 @@ function eliminarOp(proyId, idx){
 function modalNuevaOp(proyId){
   const p = DB.proyectosHA.find(x => x.id === proyId);
   if(!p) return;
-  abrirModal('Nueva operación',
-    `<div class="fg"><label>Descripción</label><textarea id="op-desc" rows="3" placeholder="Qué hay que hacer..."></textarea></div>`,
+  const plantillas = DB.config.plantillas || [];
+  const existentes = (p.operaciones||[]).map(o => o.desc);
+  const listaPl = plantillas.length
+    ? `<div class="fg">
+        <label>Plantillas</label>
+        <div id="op-plantillas" style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--r);padding:6px 8px;background:var(--surface2)">
+          ${plantillas.map((pl,i) => `
+            <label style="display:flex;align-items:center;gap:8px;padding:5px 4px;cursor:pointer;font-size:12px;color:var(--text2);border-bottom:1px solid var(--border)">
+              <input type="checkbox" value="${esc(pl)}" style="accent-color:var(--primary);width:14px;height:14px">
+              ${esc(pl)}
+            </label>`).join('')}
+        </div>
+      </div>`
+    : '<div class="text3" style="font-size:11px;margin-bottom:10px">No hay plantillas definidas. Podés agregar desde Configuración.</div>';
+
+  abrirModal('Agregar operaciones',
+    `${listaPl}
+     <div class="fg">
+       <label>Operación personalizada (opcional)</label>
+       <textarea id="op-desc" rows="2" placeholder="Escribí una operación libre..."></textarea>
+     </div>`,
     `<button class="btn" onclick="cerrarModal()">Cancelar</button>
      <button class="btn btn-p" onclick="guardarNuevaOp(${proyId})">Agregar</button>`
   );
-  setTimeout(()=>{ const el=document.getElementById('op-desc'); if(el) el.focus(); },80);
 }
 
 function guardarNuevaOp(proyId){
   const p = DB.proyectosHA.find(x => x.id === proyId);
   if(!p) return;
-  const desc = (document.getElementById('op-desc').value||'').trim();
-  if(!desc){ alert('Ingresá una descripción.'); return; }
   if(!p.operaciones) p.operaciones = [];
-  p.operaciones.push({ desc, hecha: false });
+
+  // Plantillas seleccionadas
+  const checks = document.querySelectorAll('#op-plantillas input[type=checkbox]:checked');
+  checks.forEach(ch => {
+    const desc = ch.value.trim();
+    if(desc) p.operaciones.push({ desc, hecha: false });
+  });
+
+  // Operación libre
+  const libre = (document.getElementById('op-desc').value||'').trim();
+  if(libre) p.operaciones.push({ desc: libre, hecha: false });
+
+  if(!checks.length && !libre){ alert('Seleccioná al menos una operación o escribí una.'); return; }
+
   save();
   cerrarModal();
   const cont = document.getElementById('ficha-ops');
@@ -575,23 +613,36 @@ function confirmarEliminar(id){
 function renderConfig(){
   document.getElementById('pacts').innerHTML = '';
   const cats = (DB.config.categorias||[]).join('\n');
+  const pls  = (DB.config.plantillas||[]).join('\n');
   const html = `<div class="card">
     <div class="ch"><span class="ct">Categorías de subproyecto</span></div>
     <div class="card-body">
       <div class="fg"><label>Una categoría por línea</label>
-        <textarea id="cfg-cats" rows="10" style="font-family:monospace">${esc(cats)}</textarea>
+        <textarea id="cfg-cats" rows="8" style="font-family:monospace">${esc(cats)}</textarea>
       </div>
-      <button class="btn btn-p" onclick="guardarConfig()">Guardar</button>
     </div>
-  </div>`;
+  </div>
+  <div class="card">
+    <div class="ch"><span class="ct">Plantillas de operaciones</span></div>
+    <div class="card-body">
+      <p class="text2" style="font-size:11px;margin-bottom:8px">Operaciones reutilizables. Una por línea.</p>
+      <div class="fg">
+        <textarea id="cfg-pls" rows="10" style="font-family:monospace">${esc(pls)}</textarea>
+      </div>
+    </div>
+  </div>
+  <button class="btn btn-p" onclick="guardarConfig()">Guardar todo</button>`;
   document.getElementById('content').innerHTML = html;
 }
 
 function guardarConfig(){
   const cats = (document.getElementById('cfg-cats').value||'')
     .split('\n').map(s=>s.trim()).filter(Boolean);
+  const pls  = (document.getElementById('cfg-pls').value||'')
+    .split('\n').map(s=>s.trim()).filter(Boolean);
   if(!cats.length){ alert('Necesitás al menos una categoría.'); return; }
   DB.config.categorias = cats;
+  DB.config.plantillas = pls;
   save();
   alert('Configuración guardada.');
 }
