@@ -125,6 +125,10 @@ tr:hover td{background:rgba(255,255,255,.02)}
 .op-desc.hecha{text-decoration:line-through;color:var(--text3)}
 .op-actions{display:flex;gap:4px;opacity:0;transition:opacity .15s}
 .op-item:hover .op-actions{opacity:1}
+.op-num{width:20px;flex-shrink:0;font-size:11px;font-weight:700;color:var(--text3);text-align:right}
+.op-lock{font-size:11px;opacity:.6}
+.op-item.bloqueada{opacity:.6;cursor:not-allowed}
+.op-item.bloqueada input[type=checkbox]{cursor:not-allowed}
 
 /* ── HISTORIAL ────────────────────────────────────────────── */
 .hist-item{display:flex;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);font-size:11px}
