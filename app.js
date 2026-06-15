@@ -822,7 +822,7 @@ function importarCatalogoVSS(ev){
       DB.catalogoVSS = comps.map(c => ({
         id:     c.id,
         codigo: c.codigo||'',
-        nombre: c.nombre||'',
+        nombre: c.desc||c.nombre||'',   // VSS usa 'desc' como nombre
         unidad: c.unidad||'',
         costo:  c.costo||0
       }));
