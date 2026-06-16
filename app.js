@@ -1247,7 +1247,7 @@ function renderReportes(){
       </tr>`).join('')
     : `<tr><td colspan="3" style="padding:12px;color:#7a9aa8;font-size:12px;text-align:center;">Sin datos</td></tr>`;
 
-  const html = `
+  let html = `
   <div class="card">
     <div class="ch"><span class="ct">Subproyectos por estado</span></div>
     <div class="card-body">
