@@ -827,8 +827,8 @@ function modalNuevoMaterial(proyId){
           <div class="fg full"><label>Componente</label>
             <select id="mat-comp">
               <option value="">-- seleccionar --</option>
-              ${DB.catalogoVSS.map(c =>
-                `<option value="${c.id}">${esc((c.codigo?c.codigo+' — ':'')+c.nombre)}${c.unidad?' ('+c.unidad+')':''}</option>`
+              ${[...DB.catalogoVSS].sort((a,b)=>esc(a.nombre).localeCompare(esc(b.nombre),'es')).map(c =>
+                `<option value="${c.id}">${esc((c.codigo?c.codigo+' -- ':'')+c.nombre)}${c.unidad?' ('+c.unidad+')':''}</option>`
               ).join('')}
             </select>
           </div>
