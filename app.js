@@ -414,6 +414,7 @@ function renderOps(p){
       <div class="op-actions">
         <button class="btn btn-sm" onclick="moverOp(${p.id},${i},-1)" ${i===0?'disabled':''}>↑</button>
         <button class="btn btn-sm" onclick="moverOp(${p.id},${i},1)" ${i===p.operaciones.length-1?'disabled':''}>↓</button>
+        <button class="btn btn-sm" onclick="modalEditarNota(${p.id},${i})" title="Editar nota">📝</button>
         <button class="btn btn-sm btn-d" onclick="eliminarOp(${p.id},${i})">✕</button>
       </div>
     </div>`;
@@ -442,6 +443,31 @@ function moverOp(proyId, idx, dir){
   if(newIdx < 0 || newIdx >= ops.length) return;
   [ops[idx], ops[newIdx]] = [ops[newIdx], ops[idx]];
   save();
+  const cont = document.getElementById('ficha-ops');
+  if(cont) cont.innerHTML = renderOps(p);
+}
+
+function modalEditarNota(proyId, idx){
+  const p = DB.proyectosHA.find(x => x.id === proyId);
+  if(!p || !p.operaciones[idx]) return;
+  const op = p.operaciones[idx];
+  abrirModal('Nota de operacion',
+    `<div style="font-size:12px;color:var(--text2);margin-bottom:10px;font-weight:600">${esc(op.desc)}</div>
+     <div class="fg">
+       <label>Nota / detalle</label>
+       <textarea id="edit-nota" rows="4" placeholder="Detalle especifico...">${esc(op.nota||'')}</textarea>
+     </div>`,
+    `<button class="btn" onclick="cerrarModal()">Cancelar</button>
+     <button class="btn btn-p" onclick="guardarNota(${proyId},${idx})">Guardar</button>`
+  );
+}
+
+function guardarNota(proyId, idx){
+  const p = DB.proyectosHA.find(x => x.id === proyId);
+  if(!p || !p.operaciones[idx]) return;
+  p.operaciones[idx].nota = (document.getElementById('edit-nota').value||'').trim();
+  save();
+  cerrarModal();
   const cont = document.getElementById('ficha-ops');
   if(cont) cont.innerHTML = renderOps(p);
 }
