@@ -446,6 +446,7 @@ function toggleOp(proyId, idx){
   const p = DB.proyectosHA.find(x => x.id === proyId);
   if(!p || !p.operaciones[idx]) return;
   p.operaciones[idx].hecha = !p.operaciones[idx].hecha;
+  agregarHistorial(p, `Operacion ${idx+1} "${p.operaciones[idx].desc}" ${p.operaciones[idx].hecha ? "completada" : "desmarcada"}`);
   save();
   const cont = document.getElementById('ficha-ops');
   if(cont) cont.innerHTML = renderOps(p);
@@ -486,6 +487,7 @@ function guardarNota(proyId, idx){
   const p = DB.proyectosHA.find(x => x.id === proyId);
   if(!p || !p.operaciones[idx]) return;
   p.operaciones[idx].nota = (document.getElementById('edit-nota').value||'').trim();
+  agregarHistorial(p, `Nota editada en operacion ${idx+1}`);
   save();
   cerrarModal();
   const cont = document.getElementById('ficha-ops');
@@ -496,7 +498,9 @@ function eliminarOp(proyId, idx){
   const p = DB.proyectosHA.find(x => x.id === proyId);
   if(!p) return;
   if(!confirm('¿Eliminar esta operación?')) return;
+  const descOp = p.operaciones[idx].desc;
   p.operaciones.splice(idx, 1);
+  agregarHistorial(p, `Operacion eliminada: "${descOp}"`);
   save();
   const cont = document.getElementById('ficha-ops');
   if(cont) cont.innerHTML = renderOps(p);
@@ -565,6 +569,7 @@ function guardarNuevaOp(proyId){
 
   const nota = (document.getElementById('op-nota')||{value:''}).value.trim();
   p.operaciones.push({ desc, nota, hecha: false });
+  agregarHistorial(p, `Operacion agregada: "${desc}"`);
   save();
   cerrarModal();
   const cont = document.getElementById('ficha-ops');
@@ -979,7 +984,9 @@ function guardarMaterial(proyId){
   const notasCat  = document.getElementById('mat-notas') ? (document.getElementById('mat-notas').value||'').trim() : '';
   if(compId){
     if(!cantCat || cantCat <= 0){ alert('Ingresá una cantidad para el componente del catálogo.'); return; }
+    const compNombre = (DB.catalogoVSS.find(c=>c.id===compId)||{}).nombre||compId;
     p.materiales.push({ compId, cant: cantCat, notas: notasCat });
+    agregarHistorial(p, `Material agregado: "${compNombre}" x${cantCat}`);
     agregados++;
   }
 
@@ -994,6 +1001,7 @@ function guardarMaterial(proyId){
     const mat = { nombreLibre: libre, cant: cantMan, notas: notasMan };
     if(costoMan != null && !isNaN(costoMan)) mat.costoManual = costoMan;
     p.materiales.push(mat);
+    agregarHistorial(p, `Material manual agregado: "${libre}" x${cantMan}`);
     agregados++;
     // Guardar en lista si checkbox marcado y nombre nuevo
     const guardarLista = document.getElementById('mat-guardar-lista');
@@ -1018,7 +1026,9 @@ function eliminarMaterial(proyId, idx){
   const p = DB.proyectosHA.find(x => x.id === proyId);
   if(!p || !p.materiales) return;
   if(!confirm('¿Eliminar este material?')) return;
+  const matDesc = p.materiales[idx].nombreLibre || (DB.catalogoVSS.find(c=>c.id===p.materiales[idx].compId)||{}).nombre || 'material';
   p.materiales.splice(idx, 1);
+  agregarHistorial(p, `Material eliminado: "${matDesc}"`);
   save();
   const cont = document.getElementById('ficha-mats');
   if(cont) cont.innerHTML = renderMateriales(p);
