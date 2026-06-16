@@ -268,7 +268,7 @@ function filtrarProyectos(){
     <tbody>${lista.map(p => {
       const pct = pctOperaciones(p);
       return `<tr onclick="abrirProyecto(${p.id})" style="cursor:pointer">
-        <td class="mono text3" style="font-size:10px">${esc(p.numero)}</td>
+        <td class="mono" style="font-size:10px;color:#c0392b">${esc(p.numero)}</td>
         <td style="font-weight:600">${esc(p.titulo)}</td>
         <td class="text2" style="font-size:11px">${esc(p.categoria||'--')}</td>
         <td class="text2" style="font-size:11px">${esc(p.rubro||'--')}</td>
@@ -304,7 +304,7 @@ function renderFicha(id){
     <a onclick="goTo('proyectos')">Subproyectos</a> › ${esc(p.numero)}
   </div>
   <div class="ficha-header">
-    <div class="ficha-num">${esc(p.numero)}</div>
+    <div class="ficha-num" style="color:#c0392b">${esc(p.numero)}</div>
     <div class="ficha-title">${esc(p.titulo)}</div>
     <div class="ficha-meta">
       ${pill(p.estado)}
