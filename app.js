@@ -206,7 +206,7 @@ function cardProy(p){
   };
   const borderColor = COLOR_CARD[p.estado] || '#444';
   return `<div class="proy-card" onclick="abrirProyecto(${p.id})" style="border-left:4px solid ${borderColor}">
-    <div class="proy-card-num">${esc(p.numero)}</div>
+    <div class="proy-card-num" style="color:#c0392b">${esc(p.numero)}</div>
     <div class="proy-card-title">${esc(p.titulo)}</div>
     <div class="proy-card-obj">${esc(p.objetivo||'')}</div>
     <div class="proy-progress"><div class="proy-progress-bar" style="width:${pct}%"></div></div>
