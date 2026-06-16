@@ -1418,8 +1418,64 @@ function mostrarSplash(){
   setTimeout(() => {
     el.style.transition = 'opacity 0.4s ease';
     el.style.opacity = '0';
-    setTimeout(() => el.remove(), 400);
+    setTimeout(() => { el.remove(); mostrarModalPendientes(); }, 400);
   }, 5000);
+}
+
+function mostrarModalPendientes(){
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  const limite = new Date(hoy); limite.setDate(limite.getDate() + 7);
+
+  const activos = ['En curso','Planificado'];
+  const pendientes = (DB.proyectosHA||[]).filter(p => {
+    if(!activos.includes(p.estado)) return false;
+    if(!p.fechaEstFin) return false;
+    const fin = new Date(p.fechaEstFin); fin.setHours(0,0,0,0);
+    return fin <= limite;
+  }).sort((a,b) => new Date(a.fechaEstFin) - new Date(b.fechaEstFin));
+
+  const overlay = document.createElement('div');
+  overlay.id = 'modal-pendientes';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:9998;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;padding:16px';
+
+  const hoyStr = hoy.toISOString().slice(0,10);
+
+  const filas = pendientes.length ? pendientes.map(p => {
+    const fin = new Date(p.fechaEstFin); fin.setHours(0,0,0,0);
+    const diff = Math.round((fin - hoy) / 86400000);
+    const vencido = diff < 0;
+    const hoy_ = diff === 0;
+    const color = vencido ? '#c0392b' : (hoy_ ? '#c4955a' : '#c8d8e0');
+    const label = vencido ? `Vencido hace ${Math.abs(diff)} dia${Math.abs(diff)!==1?'s':''}` : (hoy_ ? 'Vence hoy' : `Vence en ${diff} dia${diff!==1?'s':''}`);
+    return `<div onclick="cerrarPendientes();abrirProyecto(${p.id})" style="cursor:pointer;padding:10px 12px;border-left:3px solid ${color};background:var(--surface2);border-radius:4px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
+        <div>
+          <span style="font-size:10px;color:#c0392b;font-weight:700">${esc(p.numero)}</span>
+          <span style="font-size:13px;color:var(--text1);font-weight:600;margin-left:8px">${esc(p.titulo)}</span>
+        </div>
+        <span style="font-size:11px;color:${color};white-space:nowrap;flex-shrink:0">${label}</span>
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-top:3px">${esc(p.estado)} · Est. fin: ${fmtFecha(p.fechaEstFin)}</div>
+    </div>`;
+  }).join('') : '<div style="text-align:center;padding:24px;color:var(--text3);font-size:13px">Sin proyectos vencidos ni por vencer en los proximos 7 dias.</div>';
+
+  overlay.innerHTML = `<div style="background:var(--surface);border-radius:var(--r);max-width:520px;width:100%;max-height:80vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.4)">
+    <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:14px;font-weight:700;color:var(--text1)">📅 Seguimiento de fechas</span>
+      <span style="font-size:11px;color:var(--text3)">${fmtFecha(hoyStr)}</span>
+    </div>
+    <div style="padding:16px 20px">${filas}</div>
+    <div style="padding:12px 20px;border-top:1px solid var(--border);text-align:right">
+      <button class="btn btn-p" onclick="cerrarPendientes()">Entendido</button>
+    </div>
+  </div>`;
+
+  document.body.appendChild(overlay);
+}
+
+function cerrarPendientes(){
+  const el = document.getElementById('modal-pendientes');
+  if(el) el.remove();
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
