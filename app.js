@@ -839,7 +839,10 @@ function guardarConfig(){
     .split('\n').map(s=>s.trim()).filter(Boolean);
   DB.config.rubros           = rubs2;
   DB.config.categorias       = cats;
-  DB.config.plantillas      = pls;
+  // Merge: conservar plantillas agregadas desde operaciones que no estén en el textarea
+  const plsExistentes = DB.config.plantillas || [];
+  const plsMerge = [...new Set([...pls, ...plsExistentes])].sort((a,b)=>a.localeCompare(b,'es',{sensitivity:'base'}));
+  DB.config.plantillas      = plsMerge;
   DB.config.materialesManual = mans;
   save();
   alert('Configuración guardada.');
