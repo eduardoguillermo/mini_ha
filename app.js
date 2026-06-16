@@ -916,21 +916,47 @@ function exportarBackup(){
 function importarBackup(ev){
   const file = ev.target.files[0];
   if(!file) return;
-  if(!confirm('¿Restaurar este backup? Se perderán todos los datos actuales.')) return;
+  // Leer el archivo primero, confirmar después
   const reader = new FileReader();
   reader.onload = function(e){
     try{
       const data = JSON.parse(e.target.result);
-      if(!data.proyectosHA) throw new Error('Archivo inválido');
-      DB = data;
-      save();
-      alert('Backup restaurado correctamente.');
-      goTo('dashboard');
+      if(!data.proyectosHA) throw new Error('Archivo invalido');
+      // Modal de confirmacion con palabra clave
+      abrirModal('⚠️ Confirmar restauracion',
+        `<div style="background:#2a1a1a;border:1px solid #c0392b;border-radius:var(--r);padding:12px;margin-bottom:16px;font-size:12px;color:#e07070">
+           Esta accion reemplaza TODOS los datos actuales con el backup.<br>Esta operacion no se puede deshacer.
+         </div>
+         <div class="fg">
+           <label>Escribi <strong>RESTAURAR</strong> para confirmar</label>
+           <input id="confirm-restaurar" placeholder="RESTAURAR" autocomplete="off">
+         </div>`,
+        `<button class="btn" onclick="cerrarModal();document.getElementById('bk-file').value=''">Cancelar</button>
+         <button class="btn" style="background:#c0392b;color:#fff;border-color:#c0392b" onclick="ejecutarRestauracion()">Restaurar</button>`
+      );
+      // Guardar data temporalmente
+      window._pendingRestore = data;
     } catch(err){
-      alert('Error al importar: '+err.message);
+      alert('Error al leer el archivo: '+err.message);
     }
   };
   reader.readAsText(file);
+}
+
+function ejecutarRestauracion(){
+  const input = document.getElementById('confirm-restaurar');
+  if(!input || input.value.trim() !== 'RESTAURAR'){
+    input.style.borderColor = '#c0392b';
+    input.focus();
+    return;
+  }
+  if(!window._pendingRestore) return;
+  DB = window._pendingRestore;
+  window._pendingRestore = null;
+  save();
+  cerrarModal();
+  alert('Backup restaurado correctamente.');
+  goTo('dashboard');
 }
 
 // ── MATERIALES EN SUBPROYECTO ─────────────────────────────────────────────────
