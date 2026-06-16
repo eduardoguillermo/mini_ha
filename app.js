@@ -410,6 +410,7 @@ function renderOps(p){
       <span class="op-num">${i+1}</span>
       <input type="checkbox" ${op.hecha?'checked':''} ${bloqueada?'disabled':''} onchange="toggleOp(${p.id},${i})"${lockTip}>
       <span class="op-desc ${descCls}">${esc(op.desc)}${bloqueada?' <span class="op-lock">&#128274;</span>':''}</span>
+      ${op.nota ? `<div style="font-size:11px;color:var(--text3);margin:2px 0 0 28px;font-style:italic">${esc(op.nota)}</div>` : ''}
       <div class="op-actions">
         <button class="btn btn-sm" onclick="moverOp(${p.id},${i},-1)" ${i===0?'disabled':''}>↑</button>
         <button class="btn btn-sm" onclick="moverOp(${p.id},${i},1)" ${i===p.operaciones.length-1?'disabled':''}>↓</button>
@@ -476,6 +477,10 @@ function modalNuevaOp(proyId){
      <div class="fg" id="op-otro-wrap" style="display:none">
        <label>Descripcion</label>
        <input id="op-desc" placeholder="Escribi la operacion...">
+     </div>
+     <div class="fg">
+       <label>Nota / detalle <span style="font-weight:400;color:var(--text3)">(opcional)</span></label>
+       <textarea id="op-nota" rows="2" placeholder="Detalle especifico de esta operacion..."></textarea>
      </div>`,
     `<button class="btn" onclick="cerrarModal()">Cancelar</button>
      <button class="btn btn-p" onclick="guardarNuevaOp(${proyId})">Agregar</button>`
@@ -512,7 +517,8 @@ function guardarNuevaOp(proyId){
 
   if(!desc){ alert('Selecciona una operacion.'); return; }
 
-  p.operaciones.push({ desc, hecha: false });
+  const nota = (document.getElementById('op-nota')||{value:''}).value.trim();
+  p.operaciones.push({ desc, nota, hecha: false });
   save();
   cerrarModal();
   const cont = document.getElementById('ficha-ops');
