@@ -197,7 +197,15 @@ function renderDashboard(){
 
 function cardProy(p){
   const pct = pctOperaciones(p);
-  return `<div class="proy-card" onclick="abrirProyecto(${p.id})">
+  const COLOR_CARD = {
+    'Planificado':'#5a8fc4',
+    'En curso':   '#00838f',
+    'Pausado':    '#c4955a',
+    'Finalizado': '#4caf7d',
+    'Cancelado':  '#888'
+  };
+  const borderColor = COLOR_CARD[p.estado] || '#444';
+  return `<div class="proy-card" onclick="abrirProyecto(${p.id})" style="border-left:4px solid ${borderColor}">
     <div class="proy-card-num">${esc(p.numero)}</div>
     <div class="proy-card-title">${esc(p.titulo)}</div>
     <div class="proy-card-obj">${esc(p.objetivo||'')}</div>
