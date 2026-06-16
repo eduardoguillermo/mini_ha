@@ -374,6 +374,25 @@ function renderFicha(id){
     </div>`;
   }
 
+  // Cierres / aprendizajes
+  if(p.cierres && p.cierres.length){
+    html += `<div class="card">
+      <div class="ch"><span class="ct">Registros de cierre</span></div>
+      <div class="card-body">
+        ${p.cierres.slice().reverse().map(c => `
+          <div style="border-bottom:1px solid var(--border);padding:10px 0;margin-bottom:4px">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+              <span style="font-size:10px;color:var(--text3)">${fmtFecha(c.fecha)}</span>
+              ${pill(c.estado)}
+            </div>
+            ${c.razon ? `<div style="margin-bottom:6px"><span style="font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.05em">Razon</span><div style="font-size:12px;color:var(--text1);margin-top:3px">${esc(c.razon)}</div></div>` : ''}
+            ${c.aprendizajes ? `<div><span style="font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.05em">Aprendizajes</span><div style="font-size:12px;color:var(--text1);margin-top:3px">${esc(c.aprendizajes)}</div></div>` : ''}
+          </div>`
+        ).join('')}
+      </div>
+    </div>`;
+  }
+
   // Historial
   if(p.historial && p.historial.length){
     html += `<div class="card">
@@ -385,7 +404,7 @@ function renderFicha(id){
             <span class="hist-accion">${esc(h.accion)}</span>
           </div>`
         ).join('')}
-        ${p.historial.length > 20 ? `<div class="text3" style="font-size:10px;margin-top:6px">... y ${p.historial.length-20} entradas más</div>` : ''}
+        ${p.historial.length > 20 ? `<div class="text3" style="font-size:10px;margin-top:6px">... y ${p.historial.length-20} entradas mas</div>` : ''}
       </div>
     </div>`;
   }
@@ -410,7 +429,7 @@ function renderOps(p){
       <span class="op-num">${i+1}</span>
       <input type="checkbox" ${op.hecha?'checked':''} ${bloqueada?'disabled':''} onchange="toggleOp(${p.id},${i})"${lockTip}>
       <span class="op-desc ${descCls}">${esc(op.desc)}${bloqueada?' <span class="op-lock">&#128274;</span>':''}</span>
-      ${op.nota ? `<div style="font-size:11px;color:var(--text3);margin:2px 0 0 28px;font-style:italic">${esc(op.nota)}</div>` : ''}
+      ${op.nota ? `<div style="font-size:11px;color:var(--text3);margin:2px 0 0 28px;font-style:italic"><span style="color:var(--primary);margin-right:4px">📋</span>${esc(op.nota)}</div>` : ''}
       <div class="op-actions">
         <button class="btn btn-sm" onclick="moverOp(${p.id},${i},-1)" ${i===0?'disabled':''}>↑</button>
         <button class="btn btn-sm" onclick="moverOp(${p.id},${i},1)" ${i===p.operaciones.length-1?'disabled':''}>↓</button>
@@ -683,12 +702,27 @@ function modalCambiarEstado(id){
   const opts = ESTADOS_PROY.map(e =>
     `<option value="${e}" ${p.estado===e?'selected':''}>${e}</option>`
   ).join('');
+  const ESTADOS_CIERRE = ['Finalizado','Cancelado','Pausado'];
   abrirModal('Cambiar estado',
-    `<div class="fg"><label>Estado</label><select id="ce-estado">${opts}</select></div>
+    `<div class="fg"><label>Estado</label><select id="ce-estado" onchange="toggleCierreFields()">${opts}</select></div>
+     <div id="ce-cierre-wrap" style="display:none">
+       <div class="fg"><label>Razon del cierre</label><textarea id="ce-razon" rows="2" placeholder="Por que se cierra, suspende o cancela..."></textarea></div>
+       <div class="fg"><label>Aprendizajes</label><textarea id="ce-aprend" rows="2" placeholder="Que aprendimos, que hariamos diferente..."></textarea></div>
+     </div>
      <div class="fg"><label>Nota (opcional)</label><input id="ce-nota" placeholder="Motivo del cambio..."></div>`,
     `<button class="btn" onclick="cerrarModal()">Cancelar</button>
      <button class="btn btn-p" onclick="guardarEstado(${id})">Guardar</button>`
   );
+  // Mostrar campos si el estado actual ya es de cierre
+  setTimeout(() => toggleCierreFields(), 50);
+}
+
+function toggleCierreFields(){
+  const sel = document.getElementById('ce-estado');
+  const wrap = document.getElementById('ce-cierre-wrap');
+  if(!sel || !wrap) return;
+  const ESTADOS_CIERRE = ['Finalizado','Cancelado','Pausado'];
+  wrap.style.display = ESTADOS_CIERRE.includes(sel.value) ? '' : 'none';
 }
 
 function guardarEstado(id){
@@ -700,6 +734,23 @@ function guardarEstado(id){
   p.estado = nuevo;
   if(nuevo === 'Finalizado' && !p.fechaFinReal) p.fechaFinReal = today();
   if(nuevo !== 'Finalizado') p.fechaFinReal = '';
+
+  // Registro de cierre
+  const ESTADOS_CIERRE = ['Finalizado','Cancelado','Pausado'];
+  if(ESTADOS_CIERRE.includes(nuevo)){
+    const razon  = (document.getElementById('ce-razon').value||'').trim();
+    const aprend = (document.getElementById('ce-aprend').value||'').trim();
+    if(razon || aprend){
+      if(!p.cierres) p.cierres = [];
+      p.cierres.push({
+        fecha: today(),
+        estado: nuevo,
+        razon,
+        aprendizajes: aprend
+      });
+    }
+  }
+
   const msg = `Estado: ${anterior} → ${nuevo}` + (nota ? ` (${nota})` : '');
   agregarHistorial(p, msg);
   save();
@@ -1193,7 +1244,7 @@ function renderBackup(){
     <div class="ch"><span class="ct">Caché y Service Worker</span></div>
     <div class="card-body">
       <p class="text2" style="font-size:12px;margin-bottom:12px">Si la app no refleja los últimos cambios, limpiá el caché y recargá.</p>
-      <button class="btn btn-d" onclick="limpiarCache()">🔄 Limpiar caché y recargar</button>
+      <button class="btn" style="background:#c8960a;color:#fff;border-color:#c8960a" onclick="limpiarCache()">🔄 Limpiar caché y recargar</button>
     </div>
   </div>
   <div class="card">
