@@ -1294,7 +1294,108 @@ function renderReportes(){
     </div>
   </div>`;
 
+  // ── Sección Operaciones
+  const todasOps = [];
+  ps.forEach(p => {
+    (p.operaciones||[]).forEach(op => {
+      todasOps.push({ desc: op.desc, hecha: op.hecha, proyecto: p.numero });
+    });
+  });
+
+  const totalOpsCreadas = todasOps.length;
+  const totalOpsHechas = todasOps.filter(o => o.hecha).length;
+  const pctOpsGlobal = totalOpsCreadas ? Math.round(totalOpsHechas/totalOpsCreadas*100) : 0;
+
+  // Ranking por frecuencia
+  const rankMap = {};
+  todasOps.forEach(o => {
+    const k = o.desc;
+    if(!rankMap[k]) rankMap[k] = { desc: k, usos: 0, hechas: 0 };
+    rankMap[k].usos++;
+    if(o.hecha) rankMap[k].hechas++;
+  });
+  const ranking = Object.values(rankMap).sort((a,b) => b.usos - a.usos);
+
+  const filasRanking = ranking.length ? ranking.map((r,i) => {
+    const pct = Math.round(r.hechas/r.usos*100);
+    return `<tr>
+      <td style="padding:6px 8px;color:#7a9aa8;font-size:11px">${i+1}</td>
+      <td style="padding:6px 8px;font-size:12px;color:#c8d8e0">${esc(r.desc)}</td>
+      <td style="padding:6px 8px;font-size:12px;color:#c8d8e0;text-align:center">${r.usos}</td>
+      <td style="padding:6px 8px;font-size:12px;text-align:center">
+        <span style="color:${pct===100?'#4caf7d':pct>50?'#c4955a':'#7a9aa8'}">${pct}%</span>
+      </td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="4" style="padding:12px;color:#7a9aa8;font-size:12px;text-align:center">Sin operaciones registradas</td></tr>';
+
+  // Plantillas vs uso real
+  const plantillas = DB.config.plantillas || [];
+  const filasPlantillas = plantillas.length ? [...plantillas].sort((a,b)=>a.localeCompare(b,'es',{sensitivity:'base'})).map(pl => {
+    const usos = todasOps.filter(o => o.desc === pl).length;
+    const sinUso = usos === 0;
+    return `<tr style="${sinUso?'opacity:0.5':''}">
+      <td style="padding:6px 8px;font-size:12px;color:${sinUso?'#7a9aa8':'#c8d8e0'}">${esc(pl)}</td>
+      <td style="padding:6px 8px;font-size:12px;text-align:center;color:${sinUso?'#7a9aa8':'#c8d8e0'}">${usos}</td>
+      <td style="padding:6px 8px;text-align:center">
+        ${sinUso ? `<button class="btn btn-sm btn-d" onclick="eliminarPlantilla(${JSON.stringify(pl)})">✕</button>` : ''}
+      </td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="3" style="padding:12px;color:#7a9aa8;font-size:12px;text-align:center">Sin plantillas definidas</td></tr>';
+
+  html += `
+  <div class="card">
+    <div class="ch"><span class="ct">Operaciones — indicador global</span></div>
+    <div class="card-body">
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+        <div class="stat-box"><div class="stat-label">Creadas</div><div class="stat-val">${totalOpsCreadas}</div></div>
+        <div class="stat-box"><div class="stat-label">Completadas</div><div class="stat-val">${totalOpsHechas}</div></div>
+        <div class="stat-box"><div class="stat-label">% completado</div><div class="stat-val">${pctOpsGlobal}%</div></div>
+      </div>
+      <div style="height:6px;background:rgba(255,255,255,0.08);border-radius:3px">
+        <div style="height:100%;width:${pctOpsGlobal}%;background:#00838f;border-radius:3px;transition:width 0.6s"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="ch"><span class="ct">Ranking de operaciones</span></div>
+    <div class="card-body" style="padding:0">
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr style="border-bottom:1px solid var(--border)">
+          <th style="padding:6px 8px;font-size:10px;color:#7a9aa8;font-weight:600;text-align:left">#</th>
+          <th style="padding:6px 8px;font-size:10px;color:#7a9aa8;font-weight:600;text-align:left">Operacion</th>
+          <th style="padding:6px 8px;font-size:10px;color:#7a9aa8;font-weight:600;text-align:center">Usos</th>
+          <th style="padding:6px 8px;font-size:10px;color:#7a9aa8;font-weight:600;text-align:center">% completada</th>
+        </tr></thead>
+        <tbody>${filasRanking}</tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="ch"><span class="ct">Plantillas — uso real</span>
+      <span style="font-size:10px;color:#7a9aa8;font-weight:400">Las sin uso pueden eliminarse</span>
+    </div>
+    <div class="card-body" style="padding:0">
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr style="border-bottom:1px solid var(--border)">
+          <th style="padding:6px 8px;font-size:10px;color:#7a9aa8;font-weight:600;text-align:left">Plantilla</th>
+          <th style="padding:6px 8px;font-size:10px;color:#7a9aa8;font-weight:600;text-align:center">Usos</th>
+          <th style="padding:6px 8px;font-size:10px;color:#7a9aa8;font-weight:600;text-align:center"></th>
+        </tr></thead>
+        <tbody>${filasPlantillas}</tbody>
+      </table>
+    </div>
+  </div>`;
+
   document.getElementById('content').innerHTML = html;
+}
+
+function eliminarPlantilla(desc){
+  if(!DB.config.plantillas) return;
+  DB.config.plantillas = DB.config.plantillas.filter(p => p !== desc);
+  save();
+  renderReportes();
 }
 
 function exportarReporteXLSX(){
