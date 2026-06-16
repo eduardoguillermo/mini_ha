@@ -460,8 +460,8 @@ function renderOps(p){
         <span class="op-desc ${descCls}">${esc(op.desc)}${bloqueada?' <span class="op-lock">&#128274;</span>':''}</span>
         ${op.nota ? `<div style="font-size:11px;color:var(--text3);margin:2px 0 0 28px;font-style:italic"><span style="color:var(--primary);margin-right:4px">📋</span>${esc(op.nota)}</div>` : ''}
         <div class="op-actions">
-          <button class="btn btn-sm" onclick="moverOp(${p.id},${i},-1)" ${i===0?'disabled':''}>↑</button>
-          <button class="btn btn-sm" onclick="moverOp(${p.id},${i},1)" ${i===p.operaciones.length-1?'disabled':''}>↓</button>
+          <button class="btn btn-sm" onclick="moverOp(${p.id},${i},-1)" ${posEnSec===0?'disabled':''}>↑</button>
+          <button class="btn btn-sm" onclick="moverOp(${p.id},${i},1)" ${posEnSec===items.length-1?'disabled':''}>↓</button>
           <button class="btn btn-sm" onclick="modalEditarNota(${p.id},${i})" title="Editar nota">📝</button>
           <button class="btn btn-sm btn-d" onclick="eliminarOp(${p.id},${i})">✕</button>
         </div>
@@ -491,8 +491,11 @@ function moverOp(proyId, idx, dir){
   const p = DB.proyectosHA.find(x => x.id === proyId);
   if(!p) return;
   const ops = p.operaciones;
+  const seccion = ops[idx].seccion || 'General';
   const newIdx = idx + dir;
+  // Solo mover dentro de la misma sección
   if(newIdx < 0 || newIdx >= ops.length) return;
+  if((ops[newIdx].seccion || 'General') !== seccion) return;
   [ops[idx], ops[newIdx]] = [ops[newIdx], ops[idx]];
   save();
   const cont = document.getElementById('ficha-ops');
