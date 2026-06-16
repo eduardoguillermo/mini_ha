@@ -375,11 +375,12 @@ function renderFicha(id){
   }
 
   // Cierres / aprendizajes
-  if(p.cierres && p.cierres.length){
+  {
+    const cierres = p.cierres || [];
     html += `<div class="card">
       <div class="ch"><span class="ct">Registros de cierre</span></div>
       <div class="card-body">
-        ${p.cierres.slice().reverse().map(c => `
+        ${cierres.length ? cierres.slice().reverse().map(c => `
           <div style="border-bottom:1px solid var(--border);padding:10px 0;margin-bottom:4px">
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
               <span style="font-size:10px;color:var(--text3)">${fmtFecha(c.fecha)}</span>
@@ -388,7 +389,7 @@ function renderFicha(id){
             ${c.razon ? `<div style="margin-bottom:6px"><span style="font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.05em">Razon</span><div style="font-size:12px;color:var(--text1);margin-top:3px">${esc(c.razon)}</div></div>` : ''}
             ${c.aprendizajes ? `<div><span style="font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.05em">Aprendizajes</span><div style="font-size:12px;color:var(--text1);margin-top:3px">${esc(c.aprendizajes)}</div></div>` : ''}
           </div>`
-        ).join('')}
+        ).join('') : '<div class="empty" style="padding:12px;font-size:12px">Sin registros de cierre aun.</div>'}
       </div>
     </div>`;
   }
