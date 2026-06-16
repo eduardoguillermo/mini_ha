@@ -458,30 +458,36 @@ function eliminarOp(proyId, idx){
 function modalNuevaOp(proyId){
   const p = DB.proyectosHA.find(x => x.id === proyId);
   if(!p) return;
-  const plantillas = DB.config.plantillas || [];
-  const existentes = (p.operaciones||[]).map(o => o.desc);
-  const listaPl = plantillas.length
-    ? `<div class="fg">
-        <label>Plantillas</label>
-        <div id="op-plantillas" style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--r);padding:6px 8px;background:var(--surface2)">
-          ${plantillas.map((pl,i) => `
-            <label style="display:flex;align-items:center;gap:8px;padding:5px 4px;cursor:pointer;font-size:12px;color:var(--text2);border-bottom:1px solid var(--border)">
-              <input type="checkbox" value="${esc(pl)}" style="accent-color:var(--primary);width:14px;height:14px">
-              ${esc(pl)}
-            </label>`).join('')}
-        </div>
-      </div>`
-    : '<div class="text3" style="font-size:11px;margin-bottom:10px">No hay plantillas definidas. Podés agregar desde Configuración.</div>';
+  const plantillas = (DB.config.plantillas || []).slice().sort((a,b)=>a.localeCompare(b,'es',{sensitivity:'base'}));
 
-  abrirModal('Agregar operaciones',
-    `${listaPl}
-     <div class="fg">
-       <label>Operación personalizada (opcional)</label>
-       <textarea id="op-desc" rows="2" placeholder="Escribí una operación libre..."></textarea>
+  const opts = plantillas.map(pl =>
+    `<option value="${esc(pl)}">${esc(pl)}</option>`
+  ).join('');
+
+  abrirModal('Agregar operacion',
+    `<div class="fg">
+       <label>Operacion</label>
+       <select id="op-sel" onchange="toggleOpOtro()">
+         <option value="">-- seleccionar --</option>
+         ${opts}
+         <option value="__otro__">Otro...</option>
+       </select>
+     </div>
+     <div class="fg" id="op-otro-wrap" style="display:none">
+       <label>Descripcion</label>
+       <input id="op-desc" placeholder="Escribi la operacion...">
      </div>`,
     `<button class="btn" onclick="cerrarModal()">Cancelar</button>
      <button class="btn btn-p" onclick="guardarNuevaOp(${proyId})">Agregar</button>`
   );
+}
+
+function toggleOpOtro(){
+  const sel = document.getElementById('op-sel');
+  const wrap = document.getElementById('op-otro-wrap');
+  if(!sel || !wrap) return;
+  wrap.style.display = sel.value === '__otro__' ? '' : 'none';
+  if(sel.value === '__otro__') document.getElementById('op-desc').focus();
 }
 
 function guardarNuevaOp(proyId){
@@ -489,19 +495,24 @@ function guardarNuevaOp(proyId){
   if(!p) return;
   if(!p.operaciones) p.operaciones = [];
 
-  // Plantillas seleccionadas
-  const checks = document.querySelectorAll('#op-plantillas input[type=checkbox]:checked');
-  checks.forEach(ch => {
-    const desc = ch.value.trim();
-    if(desc) p.operaciones.push({ desc, hecha: false });
-  });
+  const sel = document.getElementById('op-sel');
+  const val = sel ? sel.value : '';
 
-  // Operación libre
-  const libre = (document.getElementById('op-desc').value||'').trim();
-  if(libre) p.operaciones.push({ desc: libre, hecha: false });
+  let desc = '';
+  if(val === '__otro__'){
+    desc = (document.getElementById('op-desc').value||'').trim();
+    if(!desc){ alert('Escribi la descripcion.'); return; }
+    if(!DB.config.plantillas) DB.config.plantillas = [];
+    if(!DB.config.plantillas.includes(desc)){
+      DB.config.plantillas.push(desc);
+    }
+  } else {
+    desc = val.trim();
+  }
 
-  if(!checks.length && !libre){ alert('Seleccioná al menos una operación o escribí una.'); return; }
+  if(!desc){ alert('Selecciona una operacion.'); return; }
 
+  p.operaciones.push({ desc, hecha: false });
   save();
   cerrarModal();
   const cont = document.getElementById('ficha-ops');
