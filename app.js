@@ -429,23 +429,46 @@ function renderOps(p){
   if(!p.operaciones || !p.operaciones.length){
     return `<div class="empty" style="padding:16px">Sin operaciones. Agregá la primera.</div>`;
   }
-  return p.operaciones.map((op,i) => {
-    const bloqueada = i > 0 && !p.operaciones[i-1].hecha;
-    const itemCls   = op.hecha ? 'hecha' : (bloqueada ? 'bloqueada' : '');
-    const descCls   = op.hecha ? 'hecha' : '';
-    const lockTip   = bloqueada ? ` title="Completá la operación ${i} primero"` : '';
-    return `<div class="op-item ${itemCls}" id="op-${p.id}-${i}">
-      <span class="op-num">${i+1}</span>
-      <input type="checkbox" ${op.hecha?'checked':''} ${bloqueada?'disabled':''} onchange="toggleOp(${p.id},${i})"${lockTip}>
-      <span class="op-desc ${descCls}">${esc(op.desc)}${bloqueada?' <span class="op-lock">&#128274;</span>':''}</span>
-      ${op.nota ? `<div style="font-size:11px;color:var(--text3);margin:2px 0 0 28px;font-style:italic"><span style="color:var(--primary);margin-right:4px">📋</span>${esc(op.nota)}</div>` : ''}
-      <div class="op-actions">
-        <button class="btn btn-sm" onclick="moverOp(${p.id},${i},-1)" ${i===0?'disabled':''}>↑</button>
-        <button class="btn btn-sm" onclick="moverOp(${p.id},${i},1)" ${i===p.operaciones.length-1?'disabled':''}>↓</button>
-        <button class="btn btn-sm" onclick="modalEditarNota(${p.id},${i})" title="Editar nota">📝</button>
-        <button class="btn btn-sm btn-d" onclick="eliminarOp(${p.id},${i})">✕</button>
-      </div>
-    </div>`;
+
+  // Agrupar por sección
+  const secciones = [];
+  const secMap = {};
+  p.operaciones.forEach((op, i) => {
+    const sec = op.seccion || 'General';
+    if(!secMap[sec]){ secMap[sec] = []; secciones.push(sec); }
+    secMap[sec].push({ op, i });
+  });
+
+  return secciones.map(sec => {
+    const items = secMap[sec];
+    const total = items.length;
+    const hechas = items.filter(x => x.op.hecha).length;
+    const secHeader = secciones.length > 1
+      ? `<div style="font-size:11px;font-weight:700;color:var(--primary-light);text-transform:uppercase;letter-spacing:0.08em;padding:8px 0 4px;border-bottom:1px solid var(--border);margin-bottom:4px">${esc(sec)} <span style="font-weight:400;color:var(--text3)">${hechas}/${total}</span></div>`
+      : '';
+
+    const opsHtml = items.map(({op, i}, posEnSec) => {
+      // Bloqueo secuencial dentro de la misma sección
+      const prevEnSec = posEnSec > 0 ? items[posEnSec-1].op : null;
+      const bloqueada = prevEnSec !== null && !prevEnSec.hecha;
+      const itemCls = op.hecha ? 'hecha' : (bloqueada ? 'bloqueada' : '');
+      const descCls = op.hecha ? 'hecha' : '';
+      const lockTip = bloqueada ? ` title="Completá la operación anterior de esta sección primero"` : '';
+      return `<div class="op-item ${itemCls}" id="op-${p.id}-${i}">
+        <span class="op-num">${i+1}</span>
+        <input type="checkbox" ${op.hecha?'checked':''} ${bloqueada?'disabled':''} onchange="toggleOp(${p.id},${i})"${lockTip}>
+        <span class="op-desc ${descCls}">${esc(op.desc)}${bloqueada?' <span class="op-lock">&#128274;</span>':''}</span>
+        ${op.nota ? `<div style="font-size:11px;color:var(--text3);margin:2px 0 0 28px;font-style:italic"><span style="color:var(--primary);margin-right:4px">📋</span>${esc(op.nota)}</div>` : ''}
+        <div class="op-actions">
+          <button class="btn btn-sm" onclick="moverOp(${p.id},${i},-1)" ${i===0?'disabled':''}>↑</button>
+          <button class="btn btn-sm" onclick="moverOp(${p.id},${i},1)" ${i===p.operaciones.length-1?'disabled':''}>↓</button>
+          <button class="btn btn-sm" onclick="modalEditarNota(${p.id},${i})" title="Editar nota">📝</button>
+          <button class="btn btn-sm btn-d" onclick="eliminarOp(${p.id},${i})">✕</button>
+        </div>
+      </div>`;
+    }).join('');
+
+    return `<div style="margin-bottom:${secciones.length > 1 ? '12px' : '0'}">${secHeader}${opsHtml}</div>`;
   }).join('');
 }
 
@@ -519,12 +542,27 @@ function modalNuevaOp(proyId){
   if(!p) return;
   const plantillas = (DB.config.plantillas || []).slice().sort((a,b)=>a.localeCompare(b,'es',{sensitivity:'base'}));
 
+  // Secciones existentes en el proyecto
+  const secsExist = [...new Set((p.operaciones||[]).map(o => o.seccion || 'General'))];
+  const secOpts = secsExist.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
+
   const opts = plantillas.map(pl =>
     `<option value="${esc(pl)}">${esc(pl)}</option>`
   ).join('');
 
   abrirModal('Agregar operacion',
     `<div class="fg">
+       <label>Seccion</label>
+       <select id="op-sec" onchange="toggleSecNueva()">
+         ${secsExist.length ? secOpts : '<option value="General">General</option>'}
+         <option value="__nueva__">+ Nueva seccion...</option>
+       </select>
+     </div>
+     <div class="fg" id="op-sec-nueva-wrap" style="display:none">
+       <label>Nombre de la nueva seccion</label>
+       <input id="op-sec-nueva" placeholder="Ej: Instalacion fisica">
+     </div>
+     <div class="fg">
        <label>Operacion</label>
        <select id="op-sel" onchange="toggleOpOtro()">
          <option value="">-- seleccionar --</option>
@@ -543,6 +581,14 @@ function modalNuevaOp(proyId){
     `<button class="btn" onclick="cerrarModal()">Cancelar</button>
      <button class="btn btn-p" onclick="guardarNuevaOp(${proyId})">Agregar</button>`
   );
+}
+
+function toggleSecNueva(){
+  const sel = document.getElementById('op-sec');
+  const wrap = document.getElementById('op-sec-nueva-wrap');
+  if(!sel || !wrap) return;
+  wrap.style.display = sel.value === '__nueva__' ? '' : 'none';
+  if(sel.value === '__nueva__') document.getElementById('op-sec-nueva').focus();
 }
 
 function toggleOpOtro(){
@@ -575,9 +621,16 @@ function guardarNuevaOp(proyId){
 
   if(!desc){ alert('Selecciona una operacion.'); return; }
 
+  // Sección
+  const secSel = document.getElementById('op-sec');
+  let seccion = secSel ? secSel.value : 'General';
+  if(seccion === '__nueva__'){
+    seccion = (document.getElementById('op-sec-nueva').value||'').trim() || 'General';
+  }
+
   const nota = (document.getElementById('op-nota')||{value:''}).value.trim();
-  p.operaciones.push({ desc, nota, hecha: false });
-  agregarHistorial(p, `Operacion agregada: "${desc}"`);
+  p.operaciones.push({ desc, nota, seccion, hecha: false });
+  agregarHistorial(p, `Operacion agregada en "${seccion}": "${desc}"`);
   save();
   cerrarModal();
   const cont = document.getElementById('ficha-ops');
