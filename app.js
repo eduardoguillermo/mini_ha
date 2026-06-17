@@ -96,7 +96,23 @@ const PANELS = ['dashboard','proyectos','proy-ficha','reportes','config','backup
 let _panel = 'dashboard';
 let _proyActual = null; // id del subproyecto abierto
 
+function toggleNav(){
+  const nav = document.getElementById('nav');
+  const overlay = document.getElementById('nav-overlay');
+  if(!nav) return;
+  nav.classList.toggle('open');
+  if(overlay) overlay.classList.toggle('open');
+}
+
+function cerrarNav(){
+  const nav = document.getElementById('nav');
+  const overlay = document.getElementById('nav-overlay');
+  if(nav) nav.classList.remove('open');
+  if(overlay) overlay.classList.remove('open');
+}
+
 function goTo(panel, extra){
+  cerrarNav();
   _panel = panel;
   PANELS.forEach(p => {
     const el = document.getElementById('nav-'+p);
