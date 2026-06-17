@@ -1179,15 +1179,27 @@ function importarCatalogoVSS(ev){
       // Acepta tanto el backup completo de VSS como solo el array de componentes
       const comps = data.componentes || (Array.isArray(data) ? data : null);
       if(!comps || !comps.length) throw new Error('No se encontraron componentes en el archivo.');
+      // Calcular stock desde movimientos
+      const movs = data.movimientos || [];
+      const movArch = data.movimientosArchivados || [];
+      const stockMap = {};
+      [...movArch, ...movs].forEach(m => {
+        const cid = m.cid || m.compId;
+        if(!cid) return;
+        if(!stockMap[cid]) stockMap[cid] = 0;
+        stockMap[cid] += m.tipo === 'Entrada' ? (parseFloat(m.cant)||0) : -(parseFloat(m.cant)||0);
+      });
+
       DB.catalogoVSS = comps.map(c => ({
         id:     c.id,
         codigo: c.codigo||'',
-        nombre: c.desc||c.nombre||'',   // VSS usa 'desc' como nombre
+        nombre: c.desc||c.nombre||'',
         unidad: c.unidad||'',
-        costo:  c.costo||0
+        costo:  c.costo||0,
+        stock:  stockMap[c.id] || 0
       }));
       save();
-      alert(`Catálogo importado: ${DB.catalogoVSS.length} componentes.`);
+      alert(`Catalogo importado: ${DB.catalogoVSS.length} componentes con stock calculado.`);
       renderBackup();
     } catch(err){
       alert('Error al importar catálogo: '+err.message);
@@ -1403,6 +1415,56 @@ function renderReportes(){
       </table>
     </div>
   </div>`;
+
+  // ── Stock VSS
+  const catalogo = DB.catalogoVSS || [];
+  if(catalogo.length){
+    const conStock = catalogo.filter(c => (c.stock||0) > 0);
+    const sinStock = catalogo.filter(c => (c.stock||0) <= 0);
+    const valorTotal = catalogo.reduce((s,c) => s + (c.stock||0) * (c.costo||0), 0);
+
+    const filasStock = [...catalogo]
+      .sort((a,b) => (a.nombre||'').localeCompare(b.nombre||'','es',{sensitivity:'base'}))
+      .map(c => {
+        const st = c.stock || 0;
+        const valor = st * (c.costo||0);
+        const stColor = st <= 0 ? '#c0392b' : st < 3 ? '#c4955a' : '#4caf7d';
+        return `<tr>
+          <td style="padding:5px 8px;font-size:11px;color:#7a9aa8">${esc(c.codigo||'')}</td>
+          <td style="padding:5px 8px;font-size:12px;color:#c8d8e0">${esc(c.nombre)}</td>
+          <td style="padding:5px 8px;font-size:11px;color:#7a9aa8;text-align:center">${esc(c.unidad||'')}</td>
+          <td style="padding:5px 8px;font-size:12px;font-weight:600;text-align:center;color:${stColor}">${st}</td>
+          <td style="padding:5px 8px;font-size:11px;color:#7a9aa8;text-align:right">${fmtPesos(c.costo||0)}</td>
+          <td style="padding:5px 8px;font-size:12px;color:#c8d8e0;text-align:right">${fmtPesos(valor)}</td>
+        </tr>`;
+      }).join('');
+
+    html += `
+    <div class="card">
+      <div class="ch"><span class="ct">Stock VSS Logistica</span></div>
+      <div class="card-body">
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+          <div class="stat-box"><div class="stat-label">Componentes</div><div class="stat-val">${catalogo.length}</div></div>
+          <div class="stat-box"><div class="stat-label">Con stock</div><div class="stat-val" style="color:#4caf7d">${conStock.length}</div></div>
+          <div class="stat-box"><div class="stat-label">Sin stock</div><div class="stat-val" style="color:#c0392b">${sinStock.length}</div></div>
+          <div class="stat-box"><div class="stat-label">Valor total</div><div class="stat-val">${fmtPesos(valorTotal)}</div></div>
+        </div>
+      </div>
+      <div class="card-body" style="padding:0">
+        <table style="width:100%;border-collapse:collapse">
+          <thead><tr style="border-bottom:1px solid var(--border)">
+            <th style="padding:5px 8px;font-size:10px;color:#7a9aa8;font-weight:600;text-align:left">Cod</th>
+            <th style="padding:5px 8px;font-size:10px;color:#7a9aa8;font-weight:600;text-align:left">Componente</th>
+            <th style="padding:5px 8px;font-size:10px;color:#7a9aa8;font-weight:600;text-align:center">Unidad</th>
+            <th style="padding:5px 8px;font-size:10px;color:#7a9aa8;font-weight:600;text-align:center">Stock</th>
+            <th style="padding:5px 8px;font-size:10px;color:#7a9aa8;font-weight:600;text-align:right">Costo u.</th>
+            <th style="padding:5px 8px;font-size:10px;color:#7a9aa8;font-weight:600;text-align:right">Valor</th>
+          </tr></thead>
+          <tbody>${filasStock}</tbody>
+        </table>
+      </div>
+    </div>`;
+  }
 
   document.getElementById('content').innerHTML = html;
 }
