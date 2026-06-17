@@ -1201,7 +1201,7 @@ function importarCatalogoVSS(ev){
         stock:  stockMap[c.id] || 0
       }));
       save();
-      alert(`Catalogo importado: ${DB.catalogoVSS.length} componentes con stock calculado.`);
+      alert(`Catalogo importado: ${DB.catalogoVSS.length} componentes. Movs: ${movs.length}, Arch: ${movArch.length}, Con stock: ${DB.catalogoVSS.filter(c=>c.stock>0).length}`);
       renderBackup();
     } catch(err){
       alert('Error al importar catálogo: '+err.message);
