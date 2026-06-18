@@ -1211,6 +1211,8 @@ function importarCatalogoVSS(ev){
 }
 
 // ── STOCK ─────────────────────────────────────────────────────────────────────
+let _stockSort = { col: 'nombre', dir: 1 };
+
 function renderStock(){
   document.getElementById('pacts').innerHTML = '';
   const catalogo = DB.catalogoVSS || [];
@@ -1220,25 +1222,59 @@ function renderStock(){
     return;
   }
 
+  renderStockTabla(catalogo);
+}
+
+function sortStock(col){
+  if(_stockSort.col === col) _stockSort.dir *= -1;
+  else { _stockSort.col = col; _stockSort.dir = 1; }
+  renderStockTabla(DB.catalogoVSS || []);
+}
+
+function renderStockTabla(catalogo){
+  const q = (document.getElementById('stock-busq')||{value:''}).value.toLowerCase();
+  const filtrada = q ? catalogo.filter(c =>
+    (c.nombre||'').toLowerCase().includes(q) || (c.codigo||'').toLowerCase().includes(q)
+  ) : catalogo;
+
+  const { col, dir } = _stockSort;
+  const sorted = [...filtrada].sort((a,b) => {
+    let va, vb;
+    if(col === 'codigo')  { va = a.codigo||''; vb = b.codigo||''; return dir * va.localeCompare(vb,'es',{sensitivity:'base'}); }
+    if(col === 'nombre')  { va = a.nombre||''; vb = b.nombre||''; return dir * va.localeCompare(vb,'es',{sensitivity:'base'}); }
+    if(col === 'unidad')  { va = a.unidad||''; vb = b.unidad||''; return dir * va.localeCompare(vb,'es',{sensitivity:'base'}); }
+    if(col === 'stock')   { return dir * ((a.stock||0) - (b.stock||0)); }
+    if(col === 'costo')   { return dir * ((a.costo||0) - (b.costo||0)); }
+    if(col === 'valor')   { return dir * (((a.stock||0)*(a.costo||0)) - ((b.stock||0)*(b.costo||0))); }
+    return 0;
+  });
+
   const conStock = catalogo.filter(c => (c.stock||0) > 0);
   const sinStock = catalogo.filter(c => (c.stock||0) <= 0);
   const valorTotal = catalogo.reduce((s,c) => s + (c.stock||0) * (c.costo||0), 0);
 
-  const filasStock = [...catalogo]
-    .sort((a,b) => (a.nombre||'').localeCompare(b.nombre||'','es',{sensitivity:'base'}))
-    .map(c => {
-      const st = c.stock || 0;
-      const valor = st * (c.costo||0);
-      const stColor = st <= 0 ? '#c0392b' : st < 3 ? '#c4955a' : '#4caf7d';
-      return `<tr>
-        <td style="padding:5px 8px;font-size:11px;color:#7a9aa8">${esc(c.codigo||'')}</td>
-        <td style="padding:5px 8px;font-size:12px;color:#c8d8e0">${esc(c.nombre)}</td>
-        <td style="padding:5px 8px;font-size:11px;color:#7a9aa8;text-align:center">${esc(c.unidad||'')}</td>
-        <td style="padding:5px 8px;font-size:12px;font-weight:600;text-align:center;color:${stColor}">${st}</td>
-        <td style="padding:5px 8px;font-size:11px;color:#7a9aa8;text-align:right">${fmtPesos(c.costo||0)}</td>
-        <td style="padding:5px 8px;font-size:12px;color:#c8d8e0;text-align:right">${fmtPesos(valor)}</td>
-      </tr>`;
-    }).join('');
+  const arr = col => {
+    if(_stockSort.col !== col) return '<span style="opacity:0.25">⇅</span>';
+    return _stockSort.dir === 1 ? '↑' : '↓';
+  };
+  const th = (label, c, align='left') =>
+    `<th onclick="sortStock('${c}')" style="padding:5px 8px;font-size:10px;color:#7a9aa8;font-weight:600;text-align:${align};cursor:pointer;user-select:none">${label} ${arr(c)}</th>`;
+
+  const filasStock = sorted.map(c => {
+    const st = c.stock || 0;
+    const valor = st * (c.costo||0);
+    const stColor = st <= 0 ? '#c0392b' : st < 3 ? '#c4955a' : '#4caf7d';
+    return `<tr>
+      <td style="padding:5px 8px;font-size:11px;color:#7a9aa8">${esc(c.codigo||'')}</td>
+      <td style="padding:5px 8px;font-size:12px;color:#c8d8e0">${esc(c.nombre)}</td>
+      <td style="padding:5px 8px;font-size:11px;color:#7a9aa8;text-align:center">${esc(c.unidad||'')}</td>
+      <td style="padding:5px 8px;font-size:12px;font-weight:600;text-align:center;color:${stColor}">${st}</td>
+      <td style="padding:5px 8px;font-size:11px;color:#7a9aa8;text-align:right">${fmtPesos(c.costo||0)}</td>
+      <td style="padding:5px 8px;font-size:12px;color:#c8d8e0;text-align:right">${fmtPesos(valor)}</td>
+    </tr>`;
+  }).join('');
+
+  const prevBusq = (document.getElementById('stock-busq')||{value:''}).value;
 
   document.getElementById('content').innerHTML = `
   <div class="card">
@@ -1253,21 +1289,34 @@ function renderStock(){
     </div>
   </div>
   <div class="card">
-    <div class="ch"><span class="ct">Detalle de componentes</span></div>
+    <div class="ch"><span class="ct">Detalle de componentes</span>
+      <span style="font-size:11px;color:var(--text3)">${filtrada.length !== catalogo.length ? filtrada.length+'/'+catalogo.length : catalogo.length+' items'}</span>
+    </div>
+    <div class="card-body" style="padding:8px 12px">
+      <input id="stock-busq" placeholder="Buscar por nombre o codigo..." value="${esc(prevBusq)}"
+        oninput="renderStockTabla(DB.catalogoVSS||[])"
+        style="width:100%;box-sizing:border-box;padding:6px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);color:var(--text1);font-size:12px">
+    </div>
     <div class="card-body" style="padding:0">
       <table style="width:100%;border-collapse:collapse">
         <thead><tr style="border-bottom:1px solid var(--border)">
-          <th style="padding:5px 8px;font-size:10px;color:#7a9aa8;font-weight:600;text-align:left">Cod</th>
-          <th style="padding:5px 8px;font-size:10px;color:#7a9aa8;font-weight:600;text-align:left">Componente</th>
-          <th style="padding:5px 8px;font-size:10px;color:#7a9aa8;font-weight:600;text-align:center">Unidad</th>
-          <th style="padding:5px 8px;font-size:10px;color:#7a9aa8;font-weight:600;text-align:center">Stock</th>
-          <th style="padding:5px 8px;font-size:10px;color:#7a9aa8;font-weight:600;text-align:right">Costo u.</th>
-          <th style="padding:5px 8px;font-size:10px;color:#7a9aa8;font-weight:600;text-align:right">Valor</th>
+          ${th('Cod','codigo')}
+          ${th('Componente','nombre')}
+          ${th('Unid','unidad','center')}
+          ${th('Stock','stock','center')}
+          ${th('Costo u.','costo','right')}
+          ${th('Valor','valor','right')}
         </tr></thead>
-        <tbody>${filasStock}</tbody>
+        <tbody>${filasStock || '<tr><td colspan="6" style="padding:12px;text-align:center;color:#7a9aa8;font-size:12px">Sin resultados</td></tr>'}</tbody>
       </table>
     </div>
   </div>`;
+
+  // Restaurar foco del buscador
+  if(prevBusq){
+    const inp = document.getElementById('stock-busq');
+    if(inp){ inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
+  }
 }
 
 // ── REPORTES ──────────────────────────────────────────────────────────────────
