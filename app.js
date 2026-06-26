@@ -2,7 +2,7 @@
 
 // ── CONSTANTES ────────────────────────────────────────────────────────────────
 const SKEY = 'mini-ha';
-const VERSION = 'v1.02';
+const VERSION = 'v1.03';
 
 const ESTADOS_PROY = ['Planificado','En curso','Pausado','Finalizado','Cancelado'];
 const ESTADO_PILL = {
@@ -1732,6 +1732,7 @@ function mostrarSplash(){
           <span style="opacity:0.3;">·</span>
           <span>${VERSION}</span>
         </div>
+        <div style="margin-top:16px;font-family:'Dancing Script',cursive;font-size:22px;color:#93c5fd;">Development by Guille</div>
       </div>
     </div>
   `;
