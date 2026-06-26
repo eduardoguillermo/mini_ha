@@ -2,7 +2,7 @@
 
 // ── CONSTANTES ────────────────────────────────────────────────────────────────
 const SKEY = 'mini-ha';
-const VERSION = 'v1.03';
+const VERSION = 'v1.04';
 
 const ESTADOS_PROY = ['Planificado','En curso','Pausado','Finalizado','Cancelado'];
 const ESTADO_PILL = {
@@ -165,6 +165,11 @@ function renderDashboard(){
   const costoActivos   = activos.reduce((a, p) => a + costoSubproy(p), 0);
   const costoFin       = finalizados.reduce((a, p) => a + costoSubproy(p), 0);
 
+  const horasEst  = DB.proyectosHA.reduce((a,p)=>a+(p.operaciones||[]).reduce((b,o)=>b+(o.tiempoEst||0),0),0);
+  const horasReal = DB.proyectosHA.reduce((a,p)=>a+(p.operaciones||[]).reduce((b,o)=>b+(o.tiempoReal||0),0),0);
+  const horasEstAct  = activos.reduce((a,p)=>a+(p.operaciones||[]).reduce((b,o)=>b+(o.tiempoEst||0),0),0);
+  const horasRealAct = activos.reduce((a,p)=>a+(p.operaciones||[]).reduce((b,o)=>b+(o.tiempoReal||0),0),0);
+
   let html = `
   <div class="stats">
     <div class="stat"><div class="stat-n blue">${total}</div><div class="stat-l">Total</div></div>
@@ -172,6 +177,12 @@ function renderDashboard(){
     <div class="stat"><div class="stat-n amber">${planif.length}</div><div class="stat-l">Planificados</div></div>
     <div class="stat"><div class="stat-n amber">${pausados.length}</div><div class="stat-l">Pausados</div></div>
     <div class="stat"><div class="stat-n green">${finalizados.length}</div><div class="stat-l">Finalizados</div></div>
+  </div>
+  <div class="stats">
+    <div class="stat"><div class="stat-n" style="color:var(--primary-light)">${horasEst}hs</div><div class="stat-l">Total est.</div></div>
+    <div class="stat"><div class="stat-n green">${horasReal}hs</div><div class="stat-l">Total real</div></div>
+    <div class="stat"><div class="stat-n" style="color:var(--primary-light)">${horasEstAct}hs</div><div class="stat-l">En curso est.</div></div>
+    <div class="stat"><div class="stat-n green">${horasRealAct}hs</div><div class="stat-l">En curso real</div></div>
   </div>
   <div class="stats">
     <div class="stat"><div class="stat-n" style="color:var(--primary-light)">${fmtPesos(costoTotal)}</div><div class="stat-l">Costo total</div></div>
