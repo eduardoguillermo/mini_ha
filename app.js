@@ -2,7 +2,7 @@
 
 // ── CONSTANTES ────────────────────────────────────────────────────────────────
 const SKEY = 'mini-ha';
-const VERSION = 'v1.07';
+const VERSION = 'v1.08';
 
 // ── File System Access API ────────────────────────────────────────────────────
 let _dirHandle = null;
@@ -2031,6 +2031,8 @@ document.addEventListener('DOMContentLoaded', function(){
   load();
   goTo('dashboard');
   mhaRestaurarCarpetaGuardada();
+  const navVer = document.getElementById('nav-version');
+  if(navVer) navVer.textContent = VERSION;
 
   // Safe-close: snapshot automático + backup carpeta
   document.addEventListener('visibilitychange', ()=>{
