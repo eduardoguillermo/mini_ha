@@ -2,7 +2,7 @@
 
 // ── CONSTANTES ────────────────────────────────────────────────────────────────
 const SKEY = 'mini-ha';
-const VERSION = 'v1.04';
+const VERSION = 'v1.05';
 
 const ESTADOS_PROY = ['Planificado','En curso','Pausado','Finalizado','Cancelado'];
 const ESTADO_PILL = {
@@ -51,6 +51,53 @@ function load(){
 function save(){
   try{ localStorage.setItem(SKEY, JSON.stringify(DB)); }
   catch(e){ alert('Error al guardar: '+e.message); }
+}
+
+// ── SNAPSHOTS ─────────────────────────────────────────────────────────────────
+const SKEY_SNAPS = 'mini-ha-snaps';
+const MAX_SNAPS = 10;
+
+function mhaCargarSnaps(){
+  try{ return JSON.parse(localStorage.getItem(SKEY_SNAPS)||'[]'); }
+  catch(e){ return []; }
+}
+
+function mhaHacerSnapshot(manual=false){
+  try{
+    const snaps = mhaCargarSnaps();
+    snaps.unshift({ ts: Date.now(), manual, label: manual?'Manual':'Auto', data: JSON.stringify(DB) });
+    while(snaps.length > MAX_SNAPS) snaps.pop();
+    localStorage.setItem(SKEY_SNAPS, JSON.stringify(snaps));
+    return true;
+  } catch(e){ return false; }
+}
+
+function mhaRestaurarSnapshot(ts){
+  const snaps = mhaCargarSnaps();
+  const snap = snaps.find(s => s.ts === ts);
+  if(!snap) return;
+  if(!confirm('¿Restaurar este snapshot? Se reemplazarán los datos actuales.')) return;
+  try{
+    DB = JSON.parse(snap.data);
+    save();
+    goTo('dashboard');
+  } catch(e){ alert('Error al restaurar: '+e.message); }
+}
+
+function mhaEliminarSnapshot(ts){
+  const snaps = mhaCargarSnaps().filter(s => s.ts !== ts);
+  localStorage.setItem(SKEY_SNAPS, JSON.stringify(snaps));
+  renderBackup();
+}
+
+function mhaSalir(){
+  mhaHacerSnapshot(true);
+  const ok = mhaHacerSnapshot(true);
+  if(ok){
+    if(confirm('✅ Snapshot guardado.\n¿Cerrar Mini HA?')) window.close();
+  } else {
+    if(confirm('⚠️ No se pudo guardar snapshot.\n¿Cerrar igualmente?')) window.close();
+  }
 }
 
 // ── UTILIDADES ────────────────────────────────────────────────────────────────
@@ -1651,6 +1698,26 @@ function renderBackup(){
     <div class="card-body">
       <p class="text2" style="font-size:12px;margin-bottom:12px">Exportá o restaurá todos los datos de Mini HA.</p>
       <button class="btn btn-p" onclick="exportarBackup()">⬇️ Exportar JSON</button>
+      <button class="btn" onclick="mhaHacerSnapshot(true);renderBackup()" style="margin-left:8px;background:#0284c7;color:white;border-color:#0284c7">📸 Snapshot manual</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ch"><span class="ct">Snapshots automáticos <span class="text3" style="font-size:11px;font-weight:400">(últimos ${mhaCargarSnaps().length}/${MAX_SNAPS})</span></span></div>
+    <div class="card-body">
+      ${mhaCargarSnaps().length === 0
+        ? '<p class="text3" style="font-size:12px">Sin snapshots todavía. Se crean automáticamente al cerrar o minimizar.</p>'
+        : mhaCargarSnaps().map(s => {
+            const d = new Date(s.ts);
+            const label = d.toLocaleDateString("es-AR",{day:"2-digit",month:"2-digit",year:"2-digit"}) + " " + d.toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"});
+            return `<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;">
+              <span style="color:var(--text2)">${s.manual?"📌":"🔄"} ${label}</span>
+              <div style="display:flex;gap:6px;">
+                <button class="btn btn-sm" onclick="mhaRestaurarSnapshot(${s.ts})">↩️ Restaurar</button>
+                <button class="btn btn-sm btn-d" onclick="mhaEliminarSnapshot(${s.ts})">✕</button>
+              </div>
+            </div>`;
+          }).join("")
+      }
     </div>
   </div>
   <div class="card">
@@ -1822,4 +1889,10 @@ document.addEventListener('DOMContentLoaded', function(){
   mostrarSplash();
   load();
   goTo('dashboard');
+
+  // Safe-close: snapshot automático
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.visibilityState === 'hidden') mhaHacerSnapshot(false);
+  });
+  window.addEventListener('beforeunload', ()=>{ mhaHacerSnapshot(false); });
 });
