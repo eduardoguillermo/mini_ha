@@ -2,7 +2,7 @@
 
 // ── CONSTANTES ────────────────────────────────────────────────────────────────
 const SKEY = 'mini-ha';
-const VERSION = 'v1.01';
+const VERSION = 'v1.02';
 
 const ESTADOS_PROY = ['Planificado','En curso','Pausado','Finalizado','Cancelado'];
 const ESTADO_PILL = {
@@ -233,6 +233,10 @@ function cardProy(p){
       <span class="proy-card-cat text3">${esc(p.categoria||'')}</span>
       <span class="text3" style="font-size:10px">${pct}%</span>
     </div>
+    <div style="font-size:10px;color:var(--text3);margin-top:4px;display:flex;gap:8px;">
+      <span>&#9201; Est: <b style="color:var(--primary-light)">${(p.operaciones||[]).reduce((a,o)=>a+(o.tiempoEst||0),0)}hs</b></span>
+      <span>&#10003; Real: <b style="color:#4caf7d">${(p.operaciones||[]).reduce((a,o)=>a+(o.tiempoReal||0),0)}hs</b></span>
+    </div>
   </div>`;
 }
 
@@ -339,6 +343,7 @@ function renderFicha(id){
   <div class="card">
     <div class="ch">
       <span class="ct">Operaciones <span class="text3" style="font-size:11px;font-weight:400">${pct}% completado</span></span>
+      <span style="font-size:11px;color:var(--text3);margin-left:auto;margin-right:8px;">&#9201; Est: <b style="color:var(--primary-light)">${(p.operaciones||[]).reduce((a,o)=>a+(o.tiempoEst||0),0)}hs</b> &nbsp;&middot;&nbsp; &#10003; Real: <b style="color:#4caf7d">${(p.operaciones||[]).reduce((a,o)=>a+(o.tiempoReal||0),0)}hs</b></span>
       <button class="btn btn-sm btn-p" onclick="modalNuevaOp(${p.id})">+ Agregar</button>
     </div>
     <div class="card-body" id="ficha-ops">
@@ -477,10 +482,11 @@ function renderOps(p){
         <input type="checkbox" ${op.hecha?'checked':''} ${bloqueada?'disabled':''} onchange="toggleOp(${p.id},${i})"${lockTip}>
         <span class="op-desc ${descCls}">${esc(op.desc)}${bloqueada?' <span class="op-lock">&#128274;</span>':''}</span>
         ${op.nota ? `<div style="font-size:11px;color:var(--text3);margin:2px 0 0 28px;font-style:italic"><span style="color:var(--primary);margin-right:4px">📋</span>${esc(op.nota)}</div>` : ''}
+        ${(op.tiempoEst||op.tiempoReal) ? `<div style="font-size:10px;color:var(--text3);margin:3px 0 0 28px;display:flex;gap:10px;"><span>⏱ Est: <b style="color:var(--primary-light)">${op.tiempoEst||0}hs</b></span><span>✅ Real: <b style="color:#4caf7d">${op.tiempoReal||0}hs</b></span></div>` : ''}
         <div class="op-actions">
           <button class="btn btn-sm" onclick="moverOp(${p.id},${i},-1)" ${posEnSec===0?'disabled':''}>↑</button>
           <button class="btn btn-sm" onclick="moverOp(${p.id},${i},1)" ${posEnSec===items.length-1?'disabled':''}>↓</button>
-          <button class="btn btn-sm" onclick="modalEditarNota(${p.id},${i})" title="Editar nota">📝</button>
+          <button class="btn btn-sm" onclick="modalEditarOp(${p.id},${i})" title="Editar operación">✏️</button>
           <button class="btn btn-sm btn-d" onclick="eliminarOp(${p.id},${i})">✕</button>
         </div>
       </div>`;
@@ -546,6 +552,52 @@ function guardarNota(proyId, idx){
   if(cont) cont.innerHTML = renderOps(p);
 }
 
+function modalEditarOp(proyId, idx){
+  const p = DB.proyectosHA.find(x => x.id === proyId);
+  if(!p || !p.operaciones[idx]) return;
+  const op = p.operaciones[idx];
+  const secsExist = [...new Set((p.operaciones||[]).map(o => o.seccion || 'General'))];
+  const secOpts = secsExist.map(s => `<option value="${esc(s)}" ${s===(op.seccion||'General')?'selected':''}>${esc(s)}</option>`).join('');
+  abrirModal('Editar operacion',
+    `<div class="fg">
+       <label>Seccion</label>
+       <select id="eop-sec">${secOpts}</select>
+     </div>
+     <div class="fg">
+       <label>Descripcion</label>
+       <input id="eop-desc" value="${esc(op.desc)}">
+     </div>
+     <div class="fg">
+       <label>Nota / detalle</label>
+       <textarea id="eop-nota" rows="2">${esc(op.nota||'')}</textarea>
+     </div>
+     <div style="display:flex;gap:12px;">
+       <div class="fg" style="flex:1"><label>Tiempo estimado (hs)</label><input id="eop-test" type="number" min="0" step="0.5" value="${op.tiempoEst||0}"></div>
+       <div class="fg" style="flex:1"><label>Tiempo real (hs)</label><input id="eop-treal" type="number" min="0" step="0.5" value="${op.tiempoReal||0}"></div>
+     </div>`,
+    `<button class="btn" onclick="cerrarModal()">Cancelar</button>
+     <button class="btn btn-p" onclick="guardarEditarOp(${proyId},${idx})">Guardar</button>`
+  );
+}
+
+function guardarEditarOp(proyId, idx){
+  const p = DB.proyectosHA.find(x => x.id === proyId);
+  if(!p || !p.operaciones[idx]) return;
+  const op = p.operaciones[idx];
+  const desc = (document.getElementById('eop-desc').value||'').trim();
+  if(!desc){ alert('La descripcion no puede estar vacia.'); return; }
+  op.desc = desc;
+  op.seccion = document.getElementById('eop-sec').value || 'General';
+  op.nota = (document.getElementById('eop-nota').value||'').trim();
+  op.tiempoEst = parseFloat(document.getElementById('eop-test').value)||0;
+  op.tiempoReal = parseFloat(document.getElementById('eop-treal').value)||0;
+  agregarHistorial(p, `Operacion editada: "${desc}"`);
+  save();
+  cerrarModal();
+  const cont = document.getElementById('ficha-ops');
+  if(cont) cont.innerHTML = renderOps(p);
+}
+
 function eliminarOp(proyId, idx){
   const p = DB.proyectosHA.find(x => x.id === proyId);
   if(!p) return;
@@ -598,6 +650,10 @@ function modalNuevaOp(proyId){
      <div class="fg">
        <label>Nota / detalle <span style="font-weight:400;color:var(--text3)">(opcional)</span></label>
        <textarea id="op-nota" rows="2" placeholder="Detalle especifico de esta operacion..."></textarea>
+     </div>
+     <div style="display:flex;gap:12px;">
+       <div class="fg" style="flex:1"><label>Tiempo estimado (hs)</label><input id="op-test" type="number" min="0" step="0.5" placeholder="0"></div>
+       <div class="fg" style="flex:1"><label>Tiempo real (hs)</label><input id="op-treal" type="number" min="0" step="0.5" placeholder="0"></div>
      </div>`,
     `<button class="btn" onclick="cerrarModal()">Cancelar</button>
      <button class="btn btn-p" onclick="guardarNuevaOp(${proyId})">Agregar</button>`
@@ -650,7 +706,9 @@ function guardarNuevaOp(proyId){
   }
 
   const nota = (document.getElementById('op-nota')||{value:''}).value.trim();
-  p.operaciones.push({ desc, nota, seccion, hecha: false });
+  const tEst = parseFloat((document.getElementById('op-test')||{value:''}).value)||0;
+  const tReal = parseFloat((document.getElementById('op-treal')||{value:''}).value)||0;
+  p.operaciones.push({ desc, nota, seccion, hecha: false, tiempoEst: tEst, tiempoReal: tReal });
   agregarHistorial(p, `Operacion agregada en "${seccion}": "${desc}"`);
   save();
   cerrarModal();
