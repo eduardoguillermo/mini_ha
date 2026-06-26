@@ -2,7 +2,7 @@
 
 // ── CONSTANTES ────────────────────────────────────────────────────────────────
 const SKEY = 'mini-ha';
-const VERSION = 'v1.06';
+const VERSION = 'v1.07';
 
 // ── File System Access API ────────────────────────────────────────────────────
 let _dirHandle = null;
@@ -1978,6 +1978,8 @@ function mostrarModalPendientes(){
     const fin = new Date(p.fechaEstFin); fin.setHours(0,0,0,0);
     return fin <= limite;
   }).sort((a,b) => new Date(a.fechaEstFin) - new Date(b.fechaEstFin));
+
+  if(!pendientes.length) return; // nada para informar
 
   const overlay = document.createElement('div');
   overlay.id = 'modal-pendientes';
