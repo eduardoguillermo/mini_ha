@@ -2,7 +2,139 @@
 
 // ── CONSTANTES ────────────────────────────────────────────────────────────────
 const SKEY = 'mini-ha';
-const VERSION = 'v1.05';
+const VERSION = 'v1.06';
+
+// ── File System Access API ────────────────────────────────────────────────────
+let _dirHandle = null;
+let _folderSaveTimer = null;
+
+const MHA_IDB_NAME  = 'mini-ha-fs';
+const MHA_IDB_STORE = 'handles';
+const MHA_IDB_KEY   = 'carpeta-backup';
+
+function mhaAbrirIDB(){
+  return new Promise((res,rej)=>{
+    const req = indexedDB.open(MHA_IDB_NAME, 1);
+    req.onupgradeneeded = e => e.target.result.createObjectStore(MHA_IDB_STORE);
+    req.onsuccess = e => res(e.target.result);
+    req.onerror   = e => rej(e.target.error);
+  });
+}
+
+async function mhaGuardarHandleIDB(handle){
+  try{
+    const db = await mhaAbrirIDB();
+    const tx = db.transaction(MHA_IDB_STORE,'readwrite');
+    tx.objectStore(MHA_IDB_STORE).put(handle, MHA_IDB_KEY);
+    await new Promise((res,rej)=>{ tx.oncomplete=res; tx.onerror=rej; });
+    db.close();
+  } catch(e){ console.warn('IDB write:',e); }
+}
+
+async function mhaLeerHandleIDB(){
+  try{
+    const db = await mhaAbrirIDB();
+    const tx = db.transaction(MHA_IDB_STORE,'readonly');
+    const h = await new Promise((res,rej)=>{
+      const r = tx.objectStore(MHA_IDB_STORE).get(MHA_IDB_KEY);
+      r.onsuccess = e => res(e.target.result);
+      r.onerror   = e => rej(e.target.error);
+    });
+    db.close();
+    return h || null;
+  } catch(e){ return null; }
+}
+
+async function mhaRestaurarCarpetaGuardada(){
+  if(!('showDirectoryPicker' in window)) return;
+  const handle = await mhaLeerHandleIDB();
+  if(!handle) return;
+  try{
+    const perm = await handle.queryPermission({ mode:'readwrite' });
+    if(perm === 'granted'){
+      _dirHandle = handle;
+      mhaActualizarEstadoCarpeta();
+    } else if(perm === 'prompt'){
+      _dirHandle = handle;
+      window._pendingHandle = handle;
+    }
+  } catch(e){ console.warn('restaurarCarpeta:',e); }
+}
+
+function mhaActualizarEstadoCarpeta(){
+  const el = document.getElementById('mha-carpeta-status');
+  if(!el) return;
+  if(_dirHandle){
+    el.textContent = '📂 ' + _dirHandle.name;
+    el.style.color = '#4caf7d';
+  } else {
+    el.textContent = 'Sin carpeta vinculada';
+    el.style.color = 'var(--text3)';
+  }
+}
+
+async function mhaSeleccionarCarpeta(){
+  if(!('showDirectoryPicker' in window)){
+    alert('Tu browser no soporta esta función. Usá Chrome o Brave.');
+    return;
+  }
+  try{
+    if(window._pendingHandle){
+      try{
+        const perm = await window._pendingHandle.requestPermission({ mode:'readwrite' });
+        if(perm === 'granted'){
+          _dirHandle = window._pendingHandle;
+          window._pendingHandle = null;
+          await mhaGuardarHandleIDB(_dirHandle);
+          mhaActualizarEstadoCarpeta();
+          await mhaGuardarEnCarpeta();
+          return;
+        }
+      } catch(ep){}
+      window._pendingHandle = null;
+    }
+    _dirHandle = await window.showDirectoryPicker({ mode:'readwrite' });
+    await mhaGuardarHandleIDB(_dirHandle);
+    mhaActualizarEstadoCarpeta();
+    await mhaGuardarEnCarpeta();
+  } catch(e){
+    if(e.name !== 'AbortError') console.error('seleccionarCarpeta:',e);
+  }
+}
+
+async function mhaGuardarEnCarpeta(){
+  if(!_dirHandle) return false;
+  try{
+    const perm = await _dirHandle.queryPermission({ mode:'readwrite' });
+    if(perm === 'prompt'){
+      const granted = await _dirHandle.requestPermission({ mode:'readwrite' });
+      if(granted !== 'granted') return false;
+      mhaActualizarEstadoCarpeta();
+    } else if(perm !== 'granted') return false;
+
+    const hoy    = new Date().toISOString().slice(0,10);
+    const nombre = `mini-ha_backup_${hoy}.json`;
+    const fh     = await _dirHandle.getFileHandle(nombre, { create:true });
+    const wr     = await fh.createWritable();
+    await wr.write(JSON.stringify(DB, null, 2));
+    await wr.close();
+    console.log('Backup carpeta guardado:', nombre);
+
+    // Limpiar backups >7 días
+    const limite = new Date();
+    limite.setDate(limite.getDate() - 7);
+    for await (const [name] of _dirHandle.entries()){
+      if(/^mini-ha_backup_\d{4}-\d{2}-\d{2}\.json$/.test(name)){
+        const fechaArch = new Date(name.slice(12,22));
+        if(fechaArch < limite) try{ await _dirHandle.removeEntry(name); } catch(ed){}
+      }
+    }
+    return true;
+  } catch(e){
+    console.error('guardarEnCarpeta:',e.name, e.message);
+    return false;
+  }
+}
 
 const ESTADOS_PROY = ['Planificado','En curso','Pausado','Finalizado','Cancelado'];
 const ESTADO_PILL = {
@@ -51,6 +183,11 @@ function load(){
 function save(){
   try{ localStorage.setItem(SKEY, JSON.stringify(DB)); }
   catch(e){ alert('Error al guardar: '+e.message); }
+  // Backup carpeta con debounce 5s
+  if(_dirHandle){
+    clearTimeout(_folderSaveTimer);
+    _folderSaveTimer = setTimeout(()=>mhaGuardarEnCarpeta(), 5000);
+  }
 }
 
 // ── SNAPSHOTS ─────────────────────────────────────────────────────────────────
@@ -90,14 +227,12 @@ function mhaEliminarSnapshot(ts){
   renderBackup();
 }
 
-function mhaSalir(){
-  mhaHacerSnapshot(true);
+async function mhaSalir(){
   const ok = mhaHacerSnapshot(true);
-  if(ok){
-    if(confirm('✅ Snapshot guardado.\n¿Cerrar Mini HA?')) window.close();
-  } else {
-    if(confirm('⚠️ No se pudo guardar snapshot.\n¿Cerrar igualmente?')) window.close();
-  }
+  if(_dirHandle) await mhaGuardarEnCarpeta();
+  const msg = ok ? '✅ Snapshot guardado.' : '⚠️ No se pudo guardar snapshot.';
+  const carpetaMsg = _dirHandle ? `\n📂 Backup en carpeta "${_dirHandle.name}" guardado.` : '';
+  if(confirm(msg + carpetaMsg + '\n¿Cerrar Mini HA?')) window.close();
 }
 
 // ── UTILIDADES ────────────────────────────────────────────────────────────────
@@ -1696,9 +1831,13 @@ function renderBackup(){
   <div class="card">
     <div class="ch"><span class="ct">Backup Mini HA</span></div>
     <div class="card-body">
-      <p class="text2" style="font-size:12px;margin-bottom:12px">Exportá o restaurá todos los datos de Mini HA.</p>
-      <button class="btn btn-p" onclick="exportarBackup()">⬇️ Exportar JSON</button>
-      <button class="btn" onclick="mhaHacerSnapshot(true);renderBackup()" style="margin-left:8px;background:#0284c7;color:white;border-color:#0284c7">📸 Snapshot manual</button>
+      <p class="text2" style="font-size:12px;margin-bottom:8px">Exportá o restaurá todos los datos de Mini HA.</p>
+      <p id="mha-carpeta-status" style="font-size:11px;margin-bottom:12px;color:var(--text3)">Sin carpeta vinculada</p>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;">
+        <button class="btn btn-p" onclick="exportarBackup()">⬇️ Exportar JSON</button>
+        <button class="btn" onclick="mhaSeleccionarCarpeta().then(()=>renderBackup())" style="background:#15803d;color:white;border-color:#15803d">📂 Carpeta</button>
+        <button class="btn" onclick="mhaHacerSnapshot(true);renderBackup()" style="background:#0284c7;color:white;border-color:#0284c7">📸 Snapshot</button>
+      </div>
     </div>
   </div>
   <div class="card">
@@ -1889,10 +2028,14 @@ document.addEventListener('DOMContentLoaded', function(){
   mostrarSplash();
   load();
   goTo('dashboard');
+  mhaRestaurarCarpetaGuardada();
 
-  // Safe-close: snapshot automático
+  // Safe-close: snapshot automático + backup carpeta
   document.addEventListener('visibilitychange', ()=>{
-    if(document.visibilityState === 'hidden') mhaHacerSnapshot(false);
+    if(document.visibilityState === 'hidden'){
+      mhaHacerSnapshot(false);
+      if(_dirHandle) mhaGuardarEnCarpeta();
+    }
   });
   window.addEventListener('beforeunload', ()=>{ mhaHacerSnapshot(false); });
 });
