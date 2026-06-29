@@ -38,9 +38,7 @@
     <a onclick="goTo('config')" id="nav-config">⚙️ Configuración</a>
     <a onclick="goTo('backup')" id="nav-backup">💾 Backup</a>
   </div>
-  <div style="padding:12px 16px;border-top:1px solid rgba(255,255,255,0.08);margin-top:auto;">
-    <button onclick="mhaSalir()" style="width:100%;padding:8px;background:transparent;border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:#94a3b8;font-size:12px;cursor:pointer;">🚪 Salir</button>
-  </div>
+
 </nav>
 
 <!-- NAV OVERLAY (mobile) -->
@@ -52,6 +50,7 @@
     <button class="nav-toggle" id="nav-toggle" onclick="toggleNav()">&#9776;</button>
     <div class="ptitle" id="ptitle">Dashboard</div>
     <div class="pacts" id="pacts"></div>
+    <button onclick="mhaSalir()" title="Salir" style="background:transparent;border:1px solid rgba(255,255,255,0.2);border-radius:6px;color:#94a3b8;font-size:12px;cursor:pointer;padding:5px 10px;flex-shrink:0;">🚪 Salir</button>
   </div>
   <div class="content" id="content"></div>
 </div>
