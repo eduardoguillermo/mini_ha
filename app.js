@@ -2,7 +2,7 @@
 
 // ── CONSTANTES ────────────────────────────────────────────────────────────────
 const SKEY = 'mini-ha';
-const VERSION = 'v1.08';
+const VERSION = 'v1.09';
 
 // ── File System Access API ────────────────────────────────────────────────────
 let _dirHandle = null;
