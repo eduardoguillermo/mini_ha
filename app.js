@@ -2,7 +2,7 @@
 
 // ── CONSTANTES ────────────────────────────────────────────────────────────────
 const SKEY = 'mini-ha';
-const VERSION = 'v1.10';
+const VERSION = 'v1.11';
 
 // ── File System Access API ────────────────────────────────────────────────────
 let _dirHandle = null;
@@ -279,6 +279,11 @@ function agregarHistorial(proy, accion){
 
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
+// ── HELPER: botón de ayuda contextual ──
+function btnAyuda(ancla) {
+  return `<button onclick="window.open('./instructivo.html#${ancla}','_blank','width=1100,height=750,resizable=yes,scrollbars=yes')" title="Ver ayuda" style="background:#f59e0b;border:none;color:#1e293b;border-radius:50%;width:20px;height:20px;font-size:10px;font-weight:800;cursor:pointer;padding:0;line-height:1;margin-left:8px;flex-shrink:0;vertical-align:middle;box-shadow:0 1px 4px rgba(0,0,0,0.3);">?</button>`;
+}
+
 // ── NAVEGACIÓN ────────────────────────────────────────────────────────────────
 const PANELS = ['dashboard','proyectos','proy-ficha','reportes','stock','config','backup'];
 let _panel = 'dashboard';
@@ -319,7 +324,16 @@ function goTo(panel, extra){
     'config':     'Configuración',
     'backup':     'Backup / Restaurar'
   };
-  document.getElementById('ptitle').textContent = titles[panel] || panel;
+  const anclas = {
+    'dashboard':  'dashboard',
+    'proyectos':  'subproyectos',
+    'proy-ficha': 'ficha',
+    'reportes':   'reportes',
+    'stock':      'stock',
+    'config':     'config',
+    'backup':     'backup'
+  };
+  document.getElementById('ptitle').innerHTML = (titles[panel] || panel) + btnAyuda(anclas[panel] || 'intro');
 
   const renders = {
     'dashboard':  renderDashboard,
@@ -336,9 +350,9 @@ function goTo(panel, extra){
 
 function abrirProyecto(id){
   _proyActual = id;
-  const p = DB.proyectosHA.find(x => x.id === id);
-  if(p) document.getElementById('ptitle').textContent = p.numero + ' — ' + p.titulo;
   goTo('proy-ficha');
+  const p = DB.proyectosHA.find(x => x.id === id);
+  if(p) document.getElementById('ptitle').innerHTML = esc(p.numero) + ' — ' + esc(p.titulo) + btnAyuda('ficha');
 }
 
 // ── DASHBOARD ─────────────────────────────────────────────────────────────────
