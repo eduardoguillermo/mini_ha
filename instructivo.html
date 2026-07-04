@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mini HA · Manual de Usuario</title>
+<style>
+  :root {
+    --primary: #00838f;
+    --primary-light: #e0f7fa;
+    --green: #10b981;
+    --green-light: #ecfdf5;
+    --amber: #f59e0b;
+    --amber-light: #fffbeb;
+    --red: #ef4444;
+    --red-light: #fef2f2;
+    --teal: #0f766e;
+    --teal-light: #f0fdfa;
+    --blue: #0284c7;
+    --blue-light: #f0f9ff;
+    --purple: #a855f7;
+    --text: #1e293b;
+    --muted: #64748b;
+    --border: #e2e8f0;
+    --bg: #f8fafc;
+    --card: #ffffff;
+    --sidebar-w: 260px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); font-size: 15px; line-height: 1.6; }
+
+  .layout { display: flex; min-height: 100vh; }
+  .sidebar {
+    width: var(--sidebar-w);
+    background: #1e293b;
+    color: #cbd5e1;
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    overflow-y: auto;
+    padding: 0 0 32px 0;
+    z-index: 100;
+  }
+  .sidebar-logo {
+    padding: 20px 20px 16px;
+    border-bottom: 1px solid #334155;
+    margin-bottom: 8px;
+  }
+  .sidebar-logo h1 { font-size: 16px; font-weight: 700; color: white; }
+  .sidebar-logo p { font-size: 11px; color: #64748b; margin-top: 2px; }
+  .sidebar a {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 20px;
+    color: #94a3b8;
+    text-decoration: none;
+    font-size: 13px;
+    border-left: 3px solid transparent;
+    transition: all .15s;
+  }
+  .sidebar a:hover, .sidebar a.active {
+    color: white;
+    background: #0f172a;
+    border-left-color: var(--primary);
+  }
+  .sidebar .section-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .8px;
+    color: #475569;
+    padding: 16px 20px 4px;
+  }
+  .content {
+    margin-left: var(--sidebar-w);
+    flex: 1;
+    max-width: 860px;
+    padding: 40px 48px 80px;
+  }
+
+  .section { margin-bottom: 64px; scroll-margin-top: 24px; }
+  .section-header {
+    display: flex; align-items: center; gap: 12px;
+    border-bottom: 2px solid var(--border);
+    padding-bottom: 12px;
+    margin-bottom: 24px;
+  }
+  .section-icon { font-size: 28px; }
+  .section-title { font-size: 22px; font-weight: 700; color: var(--text); }
+  .section-subtitle { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+  h2 { font-size: 17px; font-weight: 700; margin: 28px 0 10px; color: var(--text); }
+  h3 { font-size: 15px; font-weight: 600; margin: 20px 0 8px; color: var(--text); }
+  p { margin-bottom: 10px; color: #374151; }
+  ul, ol { padding-left: 22px; margin-bottom: 12px; }
+  li { margin-bottom: 5px; color: #374151; }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-bottom: 14px;
+  }
+  .card-title { font-weight: 700; font-size: 14px; margin-bottom: 6px; }
+  .card-body { font-size: 13px; color: #4b5563; }
+
+  .note {
+    background: var(--amber-light);
+    border-left: 4px solid var(--amber);
+    border-radius: 0 8px 8px 0;
+    padding: 10px 14px;
+    margin: 14px 0;
+    font-size: 13px;
+    color: #78350f;
+  }
+  .tip {
+    background: var(--green-light);
+    border-left: 4px solid var(--green);
+    border-radius: 0 8px 8px 0;
+    padding: 10px 14px;
+    margin: 14px 0;
+    font-size: 13px;
+    color: #065f46;
+  }
+  .warning {
+    background: var(--red-light);
+    border-left: 4px solid var(--red);
+    border-radius: 0 8px 8px 0;
+    padding: 10px 14px;
+    margin: 14px 0;
+    font-size: 13px;
+    color: #7f1d1d;
+  }
+  .info {
+    background: var(--blue-light);
+    border-left: 4px solid var(--blue);
+    border-radius: 0 8px 8px 0;
+    padding: 10px 14px;
+    margin: 14px 0;
+    font-size: 13px;
+    color: #0c4a6e;
+  }
+
+  table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 13px; }
+  th { background: #f1f5f9; padding: 8px 12px; text-align: left; font-weight: 600; border: 1px solid var(--border); }
+  td { padding: 8px 12px; border: 1px solid var(--border); vertical-align: top; }
+  tr:nth-child(even) { background: #f8fafc; }
+
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11px; font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 20px;
+    white-space: nowrap;
+  }
+  .badge-green { background: #dcfce7; color: #166534; }
+  .badge-blue  { background: #dbeafe; color: #1e40af; }
+  .badge-amber { background: #fef3c7; color: #92400e; }
+  .badge-red   { background: #fee2e2; color: #991b1b; }
+  .badge-purple{ background: #f3e8ff; color: #6b21a8; }
+
+  code {
+    background: #f1f5f9;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    color: #1e293b;
+  }
+  pre {
+    background: #0f172a;
+    color: #e2e8f0;
+    border-radius: 8px;
+    padding: 14px 16px;
+    font-size: 12px;
+    font-family: 'Courier New', monospace;
+    overflow-x: auto;
+    margin: 12px 0;
+  }
+
+  .steps { counter-reset: step; }
+  .step {
+    display: flex; gap: 14px;
+    margin-bottom: 14px;
+    align-items: flex-start;
+  }
+  .step-num {
+    counter-increment: step;
+    min-width: 28px; height: 28px;
+    background: var(--primary);
+    color: white;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700;
+    flex-shrink: 0;
+  }
+  .step-body { padding-top: 4px; font-size: 14px; }
+
+  .hero {
+    background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+    color: white;
+    padding: 40px 48px;
+    margin: -40px -48px 48px;
+  }
+  .hero h1 { font-size: 28px; font-weight: 800; }
+  .hero p { color: #94a3b8; margin-top: 6px; font-size: 15px; }
+  .hero-badges { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+
+  .changelog-entry { border-left: 3px solid var(--primary); padding: 4px 0 4px 16px; margin-bottom: 28px; }
+  .changelog-version { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
+  .changelog-version .v-num { font-size: 16px; font-weight: 700; color: var(--text); }
+  .changelog-list { margin: 0; padding-left: 20px; font-size: 13.5px; color: #4b5563; line-height: 1.7; }
+  .changelog-list li { margin-bottom: 3px; }
+  .changelog-tag { display: inline-block; font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px; margin-right: 4px; }
+  .tag-feature { background: #dbeafe; color: #1e40af; }
+  .tag-fix { background: #fee2e2; color: #991b1b; }
+  .tag-infra { background: #f3e8ff; color: #6b21a8; }
+  .tag-docs { background: #fef3c7; color: #92400e; }
+
+  @media (max-width: 768px) {
+    .sidebar { display: none; }
+    .content { margin-left: 0; padding: 20px 16px; }
+    .hero { margin: -20px -16px 32px; padding: 24px 16px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <h1>🏠 Mini HA</h1>
+    <p>Manual de usuario · v1.10</p>
+  </div>
+
+  <div class="section-label">Introducción</div>
+  <a href="#intro">🏠 ¿Qué es esta app?</a>
+  <a href="#navegacion">🗂 Navegación</a>
+
+  <div class="section-label">Secciones principales</div>
+  <a href="#dashboard">📊 Dashboard</a>
+  <a href="#subproyectos">📁 Subproyectos</a>
+  <a href="#ficha">📝 Ficha de subproyecto</a>
+  <a href="#stock">📦 Stock VSS</a>
+  <a href="#reportes">📈 Reportes</a>
+  <a href="#config">⚙️ Configuración</a>
+
+  <div class="section-label">Backup y datos</div>
+  <a href="#backup">💾 Backup / Restaurar</a>
+  <a href="#carpeta">📂 Carpeta local</a>
+  <a href="#snapshots">📸 Snapshots</a>
+  <a href="#salir">🚪 Salir</a>
+
+  <div class="section-label">Historial</div>
+  <a href="#changelog">🧾 Historial de cambios</a>
+</nav>
+
+<main class="content">
+
+  <div class="hero">
+    <h1>🏠 Mini HA</h1>
+    <p>Gestión de proyectos de Home Assistant y automatización — de la idea al cierre</p>
+    <div class="hero-badges">
+      <span class="badge badge-green">✓ v1.10</span>
+      <span class="badge badge-blue">✓ Sin servidor</span>
+      <span class="badge badge-amber">✓ Datos locales</span>
+    </div>
+  </div>
+
+  <!-- INTRO -->
+  <section class="section" id="intro">
+    <div class="section-header">
+      <span class="section-icon">🏠</span>
+      <div>
+        <div class="section-title">¿Qué es Mini HA?</div>
+        <div class="section-subtitle">Descripción general de la aplicación</div>
+      </div>
+    </div>
+    <p>Mini HA es una PWA para llevar el ciclo de vida completo de los subproyectos de Home Assistant y automatización (Hogares Inteligentes): desde que se planifican hasta que se cierran, con sus operaciones, materiales, dispositivos, automatizaciones y aprendizajes.</p>
+    <p>Todo funciona sin backend: los datos viven en <code>localStorage</code> del navegador, con backup manual a archivo JSON, carpeta local o snapshots automáticos.</p>
+    <div class="tip">💡 La app funciona offline una vez instalada como PWA — no necesita internet salvo para importar/exportar backups.</div>
+  </section>
+
+  <!-- NAVEGACION -->
+  <section class="section" id="navegacion">
+    <div class="section-header">
+      <span class="section-icon">🗂</span>
+      <div>
+        <div class="section-title">Navegación</div>
+        <div class="section-subtitle">Cómo moverte por la app</div>
+      </div>
+    </div>
+    <p>El menú lateral (ícono ☰ en mobile) tiene dos grupos:</p>
+    <table>
+      <tr><th>Sección</th><th>Para qué sirve</th></tr>
+      <tr><td>📊 Dashboard</td><td>Panorama general de subproyectos activos</td></tr>
+      <tr><td>📁 Subproyectos</td><td>Lista completa, con filtros y buscador</td></tr>
+      <tr><td>📈 Reportes</td><td>Estadísticas de costos, estados y categorías</td></tr>
+      <tr><td>📦 Stock VSS</td><td>Catálogo de componentes importado desde VSS Logística</td></tr>
+      <tr><td>⚙️ Configuración</td><td>Categorías, rubros, plantillas de operaciones</td></tr>
+      <tr><td>💾 Backup</td><td>Exportar/restaurar datos, carpeta local, snapshots</td></tr>
+    </table>
+    <p>El botón <strong>🚪 Salir</strong> está siempre visible arriba a la derecha.</p>
+  </section>
+
+  <!-- DASHBOARD -->
+  <section class="section" id="dashboard">
+    <div class="section-header">
+      <span class="section-icon">📊</span>
+      <div>
+        <div class="section-title">Dashboard</div>
+        <div class="section-subtitle">Panorama general</div>
+      </div>
+    </div>
+    <p>Primera pantalla al abrir la app. Da un pantallazo rápido de los subproyectos en curso y su avance, sin tener que entrar a cada ficha.</p>
+  </section>
+
+  <!-- SUBPROYECTOS -->
+  <section class="section" id="subproyectos">
+    <div class="section-header">
+      <span class="section-icon">📁</span>
+      <div>
+        <div class="section-title">Subproyectos</div>
+        <div class="section-subtitle">Listado, filtros y alta</div>
+      </div>
+    </div>
+    <p>Cada fila es un subproyecto de HA (por ejemplo: "Riego adaptativo jardín", "Automatización luces sala"). La tabla muestra número, título, categoría, rubro, estado y % de avance (calculado según operaciones completadas).</p>
+    <h2>Filtros disponibles</h2>
+    <ul>
+      <li><strong>Buscador</strong> — por título, objetivo o número</li>
+      <li><strong>Estado</strong> — Planificado, En curso, Pausado, Finalizado, Cancelado</li>
+      <li><strong>Categoría</strong> — configurable en ⚙️ Configuración</li>
+    </ul>
+    <h2>Crear un subproyecto</h2>
+    <div class="steps">
+      <div class="step"><div class="step-num">1</div><div class="step-body">Tocar <strong>+ Nuevo</strong>.</div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-body">Completar título, objetivo, categoría, rubro y fechas estimadas.</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-body">Guardar — queda en estado "Planificado".</div></div>
+    </div>
+    <p>Desde la lista también se puede editar (✏️) o eliminar (✕) cada subproyecto sin entrar a la ficha.</p>
+  </section>
+
+  <!-- FICHA -->
+  <section class="section" id="ficha">
+    <div class="section-header">
+      <span class="section-icon">📝</span>
+      <div>
+        <div class="section-title">Ficha de subproyecto</div>
+        <div class="section-subtitle">Todo el detalle de un subproyecto, en un solo lugar</div>
+      </div>
+    </div>
+    <p>Al tocar un subproyecto se abre su ficha, organizada en secciones independientes:</p>
+
+    <div class="card">
+      <div class="card-title">⚙️ Operaciones</div>
+      <div class="card-body">Tareas del subproyecto, cada una con tiempo estimado y tiempo real. La ficha suma ambos y muestra el % completado arriba de la sección.</div>
+    </div>
+    <div class="card">
+      <div class="card-title">📦 Materiales usados</div>
+      <div class="card-body">Materiales cargados manualmente o vinculados al catálogo VSS (ver <a href="#stock">Stock VSS</a>). Si hay materiales de catálogo, aparece el botón <strong>⬇️ Exportar salidas VSS</strong> para generar el archivo de salida de stock hacia VSS Logística.</div>
+    </div>
+    <div class="card">
+      <div class="card-title">🔌 Dispositivos involucrados</div>
+      <div class="card-body">Texto libre — lista de entidades/dispositivos de HA que participan del subproyecto.</div>
+    </div>
+    <div class="card">
+      <div class="card-title">🤖 Automatizaciones</div>
+      <div class="card-body">Hasta 2 automatizaciones asociadas, con nombre y descripción (útil para pegar el YAML o la lógica en texto).</div>
+    </div>
+    <div class="card">
+      <div class="card-title">🔗 Links</div>
+      <div class="card-body">Enlaces relacionados (documentación, compras, foros).</div>
+    </div>
+    <div class="card">
+      <div class="card-title">📋 Registros de cierre</div>
+      <div class="card-body">Al finalizar o cancelar un subproyecto, se puede dejar la razón y los aprendizajes — queda como historial permanente, aunque el subproyecto se reabra después.</div>
+    </div>
+    <div class="card">
+      <div class="card-title">🕓 Historial</div>
+      <div class="card-body">Registro automático de acciones (creación, cambios de estado, ediciones), muestra las últimas 20.</div>
+    </div>
+
+    <h2>Cambiar de estado</h2>
+    <p>Desde la ficha, el botón <strong>⚡ Estado</strong> (o <strong>↩️ Reabrir</strong> si ya está Finalizado) permite mover el subproyecto entre Planificado → En curso → Pausado → Finalizado/Cancelado.</p>
+  </section>
+
+  <!-- STOCK VSS -->
+  <section class="section" id="stock">
+    <div class="section-header">
+      <span class="section-icon">📦</span>
+      <div>
+        <div class="section-title">Stock VSS</div>
+        <div class="section-subtitle">Catálogo de componentes de Viking Security Systems</div>
+      </div>
+    </div>
+    <p>Esta sección muestra el catálogo de componentes importado desde VSS Logística: código, nombre, unidad, stock disponible y costo. Sirve para vincular materiales reales al cargar "Materiales usados" en un subproyecto.</p>
+    <div class="card">
+      <div class="card-title">Resumen</div>
+      <div class="card-body">Cantidad de componentes, cuántos tienen stock, cuántos no, y el valor total del inventario.</div>
+    </div>
+    <p>La tabla de detalle se puede ordenar por cualquier columna (código, componente, unidad, stock, costo, valor) y filtrar con el buscador.</p>
+    <div class="note">📌 El catálogo se importa desde <a href="#backup">💾 Backup</a> — hay que exportar primero el backup JSON desde VSS Logística.</div>
+  </section>
+
+  <!-- REPORTES -->
+  <section class="section" id="reportes">
+    <div class="section-header">
+      <span class="section-icon">📈</span>
+      <div>
+        <div class="section-title">Reportes</div>
+        <div class="section-subtitle">Estadísticas de todos los subproyectos</div>
+      </div>
+    </div>
+    <ul>
+      <li><strong>Subproyectos por estado</strong> — gráfico de barras</li>
+      <li><strong>Costos</strong> — total general, en curso y finalizados</li>
+      <li><strong>Top 5 por costo</strong></li>
+      <li><strong>Por categoría</strong> — cantidad y costo total agrupado</li>
+      <li><strong>Operaciones</strong> — resumen de tareas hechas/pendientes en todos los subproyectos</li>
+    </ul>
+    <p>El botón <strong>⬇ Exportar Excel</strong> genera un archivo .xlsx con todo el detalle para análisis externo.</p>
+  </section>
+
+  <!-- CONFIG -->
+  <section class="section" id="config">
+    <div class="section-header">
+      <span class="section-icon">⚙️</span>
+      <div>
+        <div class="section-title">Configuración</div>
+        <div class="section-subtitle">Listas reutilizables</div>
+      </div>
+    </div>
+    <p>Todas las listas se editan como texto plano, un valor por línea:</p>
+    <table>
+      <tr><th>Lista</th><th>Para qué se usa</th></tr>
+      <tr><td>Categorías de subproyecto</td><td>Filtro y clasificación en la lista de subproyectos</td></tr>
+      <tr><td>Plantillas de operaciones</td><td>Operaciones reutilizables para no tipearlas cada vez</td></tr>
+      <tr><td>Rubros HA</td><td>Clasificación de automatizaciones</td></tr>
+      <tr><td>Materiales manuales</td><td>Nombres reutilizables para materiales sin vincular al catálogo VSS</td></tr>
+    </table>
+    <p>Después de editar, tocar <strong>Guardar todo</strong>.</p>
+  </section>
+
+  <!-- BACKUP -->
+  <section class="section" id="backup">
+    <div class="section-header">
+      <span class="section-icon">💾</span>
+      <div>
+        <div class="section-title">Backup / Restaurar</div>
+        <div class="section-subtitle">Exportar, restaurar e importar el catálogo VSS</div>
+      </div>
+    </div>
+    <h2>Catálogo VSS Logística</h2>
+    <p>Botón <strong>⬆️ Importar catálogo VSS</strong>: subís el backup JSON exportado desde VSS Logística para tener el catálogo disponible al cargar materiales en un subproyecto. <strong>🗑️ Limpiar catálogo</strong> lo borra sin afectar los materiales ya registrados en subproyectos.</p>
+    <h2>Backup de Mini HA</h2>
+    <ul>
+      <li><strong>⬇️ Exportar JSON</strong> — descarga un archivo con todos los datos</li>
+      <li><strong>📂 Carpeta</strong> — vincula una carpeta local para guardado automático (ver <a href="#carpeta">Carpeta local</a>)</li>
+      <li><strong>📸 Snapshot</strong> — fuerza un snapshot manual ahora mismo</li>
+    </ul>
+    <h2>Restaurar</h2>
+    <div class="warning">⚠️ Restaurar un backup reemplaza todos los datos actuales. No se puede deshacer.</div>
+    <h2>Caché y Service Worker</h2>
+    <p>Si la app no refleja los últimos cambios después de una actualización, usar <strong>🔄 Limpiar caché y recargar</strong>.</p>
+  </section>
+
+  <!-- CARPETA LOCAL -->
+  <section class="section" id="carpeta">
+    <div class="section-header">
+      <span class="section-icon">📂</span>
+      <div>
+        <div class="section-title">Carpeta local</div>
+        <div class="section-subtitle">Backup automático en el sistema de archivos</div>
+      </div>
+    </div>
+    <p>Vincula una carpeta del sistema de archivos donde la app guarda backups automáticos cada vez que hay cambios — funciona junto con los snapshots, como respaldo adicional en disco.</p>
+    <div class="steps">
+      <div class="step"><div class="step-num">1</div><div class="step-body">Ir a 💾 Backup y tocar <strong>📂 Carpeta</strong>.</div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-body">Elegir una carpeta del sistema de archivos.</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-body">Otorgar el permiso de escritura cuando el navegador lo pida.</div></div>
+    </div>
+    <div class="note">📌 Requiere Chrome o Brave en escritorio. No disponible en Firefox ni Safari.</div>
+    <div class="note">📌 El permiso de escritura puede vencer con el tiempo (restricción del navegador, no un bug). Cuando eso pasa, el texto de estado cambia a "requiere permiso" — tocando <strong>📂 Carpeta</strong> de nuevo se reactiva con un solo click, sin tener que volver a elegir la carpeta.</div>
+  </section>
+
+  <!-- SNAPSHOTS -->
+  <section class="section" id="snapshots">
+    <div class="section-header">
+      <span class="section-icon">📸</span>
+      <div>
+        <div class="section-title">Snapshots automáticos</div>
+        <div class="section-subtitle">Historial de respaldo local</div>
+      </div>
+    </div>
+    <p>La app guarda hasta 10 snapshots automáticamente al cerrar o minimizar (🔄), además de los que se disparan a mano (📌). Desde 💾 Backup se puede restaurar (↩️) o eliminar (✕) cualquiera de ellos.</p>
+    <div class="tip">💡 Los snapshots son la red de seguridad más rápida: no dependen de elegir carpeta ni de conexión — quedan en el propio navegador.</div>
+  </section>
+
+  <!-- SALIR -->
+  <section class="section" id="salir">
+    <div class="section-header">
+      <span class="section-icon">🚪</span>
+      <div>
+        <div class="section-title">Salir</div>
+        <div class="section-subtitle">Cierre seguro</div>
+      </div>
+    </div>
+    <p>El botón 🚪 Salir (arriba a la derecha) fuerza un snapshot antes de cerrar. La app también guarda un snapshot automáticamente si cerrás la pestaña o cambiás de app sin usar este botón (<code>beforeunload</code> / <code>visibilitychange</code>).</p>
+  </section>
+
+  <!-- CHANGELOG -->
+  <section class="section" id="changelog">
+    <div class="section-header">
+      <span class="section-icon">🧾</span>
+      <div>
+        <div class="section-title">Historial de cambios</div>
+        <div class="section-subtitle">Registro de versiones — de más reciente a más antigua</div>
+      </div>
+    </div>
+
+    <div class="changelog-entry">
+      <div class="changelog-version"><span class="v-num">v1.10</span><span class="changelog-tag tag-fix">fix</span></div>
+      <ul class="changelog-list">
+        <li>Se agregó <code>navigator.storage.persist()</code> al abrir la app, para reducir que el navegador evicte el handle de la carpeta local guardado en IndexedDB</li>
+        <li>Corregido: cuando el permiso de la carpeta local vencía, la app seguía mostrando el estado como conectada aunque había dejado de guardar en silencio. Ahora el estado pasa a "requiere permiso" y un click en 📂 Carpeta lo reactiva</li>
+      </ul>
+    </div>
+
+    <div class="changelog-entry">
+      <div class="changelog-version"><span class="v-num">v1.09</span><span class="changelog-tag tag-feature">feature</span></div>
+      <ul class="changelog-list">
+        <li>El botón 🚪 Salir se movió del panel de navegación a la barra superior</li>
+      </ul>
+    </div>
+
+    <div class="changelog-entry">
+      <div class="changelog-version"><span class="v-num">Versiones anteriores</span><span class="changelog-tag tag-infra">infra</span></div>
+      <ul class="changelog-list">
+        <li>Ciclo de vida completo de subproyectos (Planificado → En curso → Pausado → Finalizado/Cancelado), operaciones con tiempo est./real, materiales con vínculo a catálogo VSS, automatizaciones, links, registros de cierre e historial</li>
+        <li>Importación de catálogo VSS Logística desde backup JSON, con exportación de salidas de stock por subproyecto</li>
+        <li>Reportes con gráfico de estados, costos, top 5 y agrupado por categoría, con exportación a Excel</li>
+        <li>Sistema de cierre seguro: snapshots automáticos (hasta 10), carpeta local, exportación/restauración manual</li>
+      </ul>
+    </div>
+  </section>
+
+</main>
+</div>
+</body>
+</html>
