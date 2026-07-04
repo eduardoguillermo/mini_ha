@@ -1,4 +1,4 @@
-const CACHE = 'mini-ha-v1.10';
+const CACHE = 'mini-ha-v1.11';
 const ASSETS = [
   '/mini_ha/',
   '/mini_ha/index.html',
