@@ -2,7 +2,7 @@
 
 // ── CONSTANTES ────────────────────────────────────────────────────────────────
 const SKEY = 'mini-ha';
-const VERSION = 'v1.09';
+const VERSION = 'v1.10';
 
 // ── File System Access API ────────────────────────────────────────────────────
 let _dirHandle = null;
@@ -55,8 +55,11 @@ async function mhaRestaurarCarpetaGuardada(){
       _dirHandle = handle;
       mhaActualizarEstadoCarpeta();
     } else if(perm === 'prompt'){
-      _dirHandle = handle;
+      // El permiso venció — no se puede re-pedir sin gesto del usuario (requestPermission
+      // falla en silencio si se llama en automático). Se deja pendiente y se avisa
+      // visualmente para que el próximo click en "📂 Carpeta" lo reactive.
       window._pendingHandle = handle;
+      mhaActualizarEstadoCarpeta();
     }
   } catch(e){ console.warn('restaurarCarpeta:',e); }
 }
@@ -67,6 +70,9 @@ function mhaActualizarEstadoCarpeta(){
   if(_dirHandle){
     el.textContent = '📂 ' + _dirHandle.name;
     el.style.color = '#4caf7d';
+  } else if(window._pendingHandle){
+    el.textContent = '📂 ' + window._pendingHandle.name + ' · requiere permiso (tocá "Carpeta")';
+    el.style.color = '#b45309';
   } else {
     el.textContent = 'Sin carpeta vinculada';
     el.style.color = 'var(--text3)';
@@ -2027,6 +2033,9 @@ function cerrarPendientes(){
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', function(){
+  if (navigator.storage && navigator.storage.persist) {
+    navigator.storage.persist().catch(()=>{});
+  }
   mostrarSplash();
   load();
   goTo('dashboard');
