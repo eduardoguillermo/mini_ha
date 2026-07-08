@@ -2,7 +2,7 @@
 
 // ── CONSTANTES ────────────────────────────────────────────────────────────────
 const SKEY = 'mini-ha';
-const VERSION = 'v1.12';
+const VERSION = 'v1.13';
 
 // ── File System Access API ────────────────────────────────────────────────────
 let _dirHandle = null;
@@ -2086,11 +2086,6 @@ function mostrarSplash(){
       <div style="margin-bottom:2.5rem;text-align:center;">
         <div style="font-size:26px;font-weight:500;letter-spacing:0.03em;color:#c8d8e0;line-height:1.4;">Sistema de gestión de mini proyectos</div>
       </div>
-      <div style="width:100%;max-width:400px;margin-bottom:1rem;">
-        <div style="position:relative;height:1px;background:#2a2e35;">
-          <div id="splash-bar" style="position:absolute;top:0;left:0;height:100%;width:0%;background:#00838f;transition:width 5s linear;"></div>
-        </div>
-      </div>
       <div style="text-align:center;width:100%;max-width:400px;">
         <div style="display:flex;align-items:center;justify-content:center;gap:1rem;font-size:10px;color:#5a7a85;font-family:monospace;letter-spacing:0.05em;">
           <span style="color:#7a9aa8;">Mini HA</span>
@@ -2102,21 +2097,28 @@ function mostrarSplash(){
           <span>${VERSION}</span>
         </div>
         <div style="margin-top:16px;font-family:'Dancing Script',cursive;font-size:22px;color:#93c5fd;">Development by Guille</div>
+        <div style="margin-top:32px;display:flex;align-items:center;justify-content:center;gap:8px;opacity:0.85;animation:splash-pulse 1.8s ease-in-out infinite;">
+          <span style="border:1.2px solid #2a2e35;border-radius:5px;padding:3px 9px;font-size:10.5px;color:#cbd5e1;font-weight:600;">ENTER</span>
+          <span style="font-size:11.5px;color:#5a7a85;">o tocá la pantalla para continuar</span>
+        </div>
       </div>
     </div>
+    <style>@keyframes splash-pulse { 0%,100%{opacity:0.45;} 50%{opacity:1;} }</style>
   `;
   document.body.appendChild(el);
 
-  setTimeout(() => {
-    const bar = document.getElementById('splash-bar');
-    if(bar) bar.style.width = '100%';
-  }, 50);
-
-  setTimeout(() => {
-    el.style.transition = 'opacity 0.4s ease';
+  function cerrarSplash(){
+    document.removeEventListener('keydown', onKeydown);
+    el.removeEventListener('click', cerrarSplash);
+    el.style.transition = 'opacity 0.3s ease';
     el.style.opacity = '0';
-    setTimeout(() => { el.remove(); mostrarModalPendientes(); }, 400);
-  }, 5000);
+    setTimeout(() => { el.remove(); mostrarModalPendientes(); }, 300);
+  }
+  function onKeydown(e){
+    if(e.key === 'Enter') cerrarSplash();
+  }
+  document.addEventListener('keydown', onKeydown);
+  el.addEventListener('click', cerrarSplash);
 }
 
 function mostrarModalPendientes(){
