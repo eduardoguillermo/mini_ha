@@ -231,7 +231,7 @@
 <nav class="sidebar">
   <div class="sidebar-logo">
     <h1>🏠 Mini HA</h1>
-    <p>Manual de usuario · v1.10</p>
+    <p>Manual de usuario · v1.12</p>
   </div>
 
   <div class="section-label">Introducción</div>
@@ -248,6 +248,7 @@
 
   <div class="section-label">Backup y datos</div>
   <a href="#backup">💾 Backup / Restaurar</a>
+  <a href="#drive">☁️ Sincronización con Drive</a>
   <a href="#carpeta">📂 Carpeta local</a>
   <a href="#snapshots">📸 Snapshots</a>
   <a href="#salir">🚪 Salir</a>
@@ -262,9 +263,10 @@
     <h1>🏠 Mini HA</h1>
     <p>Gestión de proyectos de Home Assistant y automatización — de la idea al cierre</p>
     <div class="hero-badges">
-      <span class="badge badge-green">✓ v1.10</span>
+      <span class="badge badge-green">✓ v1.12</span>
       <span class="badge badge-blue">✓ Sin servidor</span>
       <span class="badge badge-amber">✓ Datos locales</span>
+      <span class="badge badge-purple">☁️ Sync opcional a Drive</span>
     </div>
   </div>
 
@@ -278,7 +280,7 @@
       </div>
     </div>
     <p>Mini HA es una PWA para llevar el ciclo de vida completo de los subproyectos de Home Assistant y automatización (Hogares Inteligentes): desde que se planifican hasta que se cierran, con sus operaciones, materiales, dispositivos, automatizaciones y aprendizajes.</p>
-    <p>Todo funciona sin backend: los datos viven en <code>localStorage</code> del navegador, con backup manual a archivo JSON, carpeta local o snapshots automáticos.</p>
+    <p>Todo funciona sin backend: los datos viven en <code>localStorage</code> del navegador, con backup manual a archivo JSON, carpeta local, snapshots automáticos y sincronización opcional a Google Drive.</p>
     <div class="tip">💡 La app funciona offline una vez instalada como PWA — no necesita internet salvo para importar/exportar backups.</div>
   </section>
 
@@ -299,7 +301,7 @@
       <tr><td>📈 Reportes</td><td>Estadísticas de costos, estados y categorías</td></tr>
       <tr><td>📦 Stock VSS</td><td>Catálogo de componentes importado desde VSS Logística</td></tr>
       <tr><td>⚙️ Configuración</td><td>Categorías, rubros, plantillas de operaciones</td></tr>
-      <tr><td>💾 Backup</td><td>Exportar/restaurar datos, carpeta local, snapshots</td></tr>
+      <tr><td>💾 Backup</td><td>Exportar/restaurar datos, carpeta local, snapshots y sincronización con Drive</td></tr>
     </table>
     <p>El botón <strong>🚪 Salir</strong> está siempre visible arriba a la derecha.</p>
   </section>
@@ -458,11 +460,48 @@
       <li><strong>⬇️ Exportar JSON</strong> — descarga un archivo con todos los datos</li>
       <li><strong>📂 Carpeta</strong> — vincula una carpeta local para guardado automático (ver <a href="#carpeta">Carpeta local</a>)</li>
       <li><strong>📸 Snapshot</strong> — fuerza un snapshot manual ahora mismo</li>
+      <li><strong>☁️ Conectar Drive</strong> / <strong>☁️ Backups en Drive</strong> — sincroniza con Google Drive (ver <a href="#drive">Sincronización con Drive</a>)</li>
     </ul>
     <h2>Restaurar</h2>
     <div class="warning">⚠️ Restaurar un backup reemplaza todos los datos actuales. No se puede deshacer.</div>
     <h2>Caché y Service Worker</h2>
     <p>Si la app no refleja los últimos cambios después de una actualización, usar <strong>🔄 Limpiar caché y recargar</strong>.</p>
+  </section>
+
+  <!-- DRIVE SYNC -->
+  <section class="section" id="drive">
+    <div class="section-header">
+      <span class="section-icon">☁️</span>
+      <div>
+        <div class="section-title">Sincronización con Drive</div>
+        <div class="section-subtitle">Backup en la nube, con fusión inteligente entre dispositivos</div>
+      </div>
+    </div>
+    <p>Además de la carpeta local, Mini HA puede guardar un backup en tu Google Drive, en una carpeta propia llamada <strong>"MiniHA"</strong> — separada de las demás apps del ecosistema. Sirve como respaldo fuera del dispositivo y para tener los mismos datos al abrir la app desde otra PC o celular.</p>
+
+    <h2>Conectar por primera vez</h2>
+    <div class="steps">
+      <div class="step"><div class="step-num">1</div><div class="step-body">Ir a 💾 Backup y tocar <strong>☁️ Conectar Drive</strong>.</div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-body">Elegir la cuenta de Google y aceptar el permiso (solo acceso a los archivos que la propia app crea, no a todo el Drive).</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-body">La app crea la carpeta "MiniHA" y el archivo <code>mini-ha_backup.json</code> automáticamente si no existen.</div></div>
+    </div>
+    <div class="note">📌 La sesión se guarda en el navegador y se renueva sola antes de vencer — no hace falta volver a conectar cada vez que abrís la app, salvo que borres los datos del navegador o revoques el acceso desde tu cuenta de Google.</div>
+
+    <h2>Cómo se sincroniza</h2>
+    <p>Una vez conectado, cada cambio se sube solo, con un pequeño retraso (5 segundos) para no generar una subida por cada tecla — el mismo mecanismo que la carpeta local. También se intenta subir un backup extra al minimizar la app o al usar <strong>🚪 Salir</strong>.</p>
+
+    <h2>Fusionar vs. Reemplazar</h2>
+    <p>Al tocar <strong>☁️ Backups en Drive</strong> se abre un modal con dos opciones para traer datos desde Drive hacia el dispositivo actual:</p>
+    <table>
+      <tr><th>Opción</th><th>Qué hace</th><th>Cuándo usarla</th></tr>
+      <tr><td>🔀 <strong>Fusionar</strong></td><td>Suma los subproyectos nuevos o más recientes de Drive a los que ya tenés en este dispositivo, sin borrar nada local</td><td>Recomendada casi siempre — es la forma segura de traer cambios hechos desde otro dispositivo</td></tr>
+      <tr><td><strong>Reemplazar</strong></td><td>Borra todos los datos locales y los cambia por los del backup de Drive</td><td>Solo si querés descartar por completo lo que hay en este dispositivo</td></tr>
+    </table>
+    <p>La fusión identifica cada subproyecto por un identificador único interno (no por el número "HA-00X") y se queda con la versión más reciente de cada uno cuando hay diferencias — así podés editar tranquilo desde dos dispositivos sin pisar cambios por accidente.</p>
+    <div class="warning">⚠️ Reemplazar no se puede deshacer directamente, aunque siempre queda el snapshot automático que se guarda justo antes de la operación (ver <a href="#snapshots">Snapshots</a>) por si hace falta volver atrás.</div>
+
+    <div class="tip">💡 Drive es un respaldo adicional, no reemplaza a la carpeta local ni a los snapshots — los tres mecanismos conviven y se disparan juntos en los mismos momentos (guardado, minimizado, Salir).</div>
+    <div class="note">📌 Si el navegador bloquea la ventana emergente de Google al conectar, hay que permitir popups para el sitio y volver a tocar "☁️ Conectar Drive".</div>
   </section>
 
   <!-- CARPETA LOCAL -->
@@ -517,6 +556,16 @@
         <div class="section-title">Historial de cambios</div>
         <div class="section-subtitle">Registro de versiones — de más reciente a más antigua</div>
       </div>
+    </div>
+
+    <div class="changelog-entry">
+      <div class="changelog-version"><span class="v-num">v1.12</span><span class="changelog-tag tag-feature">feature</span></div>
+      <ul class="changelog-list">
+        <li>Sincronización con Google Drive: carpeta propia "MiniHA", conexión con un click y renovación de sesión automática</li>
+        <li>Fusión de datos por identificador único y fecha de modificación (last-write-wins) al traer un backup de Drive, sin pisar cambios locales</li>
+        <li>Opción de Reemplazar total como alternativa a la fusión, con snapshot automático de seguridad antes de ejecutarla</li>
+        <li>El guardado, el botón 🚪 Salir y el evento de minimizar ahora también intentan subir a Drive, además de la carpeta local y los snapshots existentes</li>
+      </ul>
     </div>
 
     <div class="changelog-entry">
