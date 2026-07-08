@@ -98,34 +98,44 @@ const DriveSync = (() => {
     return resp;
   }
 
+  let _folderPromise = null;
   async function ensureFolder() {
     if (folderId) return folderId;
-    const q = encodeURIComponent(`name='${CARPETA}' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
-    const resp = await api(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)`);
-    const data = await resp.json();
-    if (data.files && data.files.length) { folderId = data.files[0].id; return folderId; }
+    if (_folderPromise) return _folderPromise; // ya hay una búsqueda/creación en curso: esperar esa misma
+    _folderPromise = (async () => {
+      const q = encodeURIComponent(`name='${CARPETA}' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
+      const resp = await api(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)`);
+      const data = await resp.json();
+      if (data.files && data.files.length) { folderId = data.files[0].id; return folderId; }
 
-    const createResp = await api('https://www.googleapis.com/drive/v3/files', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: CARPETA, mimeType: 'application/vnd.google-apps.folder' })
-    });
-    const created = await createResp.json();
-    folderId = created.id;
-    return folderId;
+      const createResp = await api('https://www.googleapis.com/drive/v3/files', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: CARPETA, mimeType: 'application/vnd.google-apps.folder' })
+      });
+      const created = await createResp.json();
+      folderId = created.id;
+      return folderId;
+    })();
+    try { return await _folderPromise; } finally { _folderPromise = null; }
   }
 
+  let _backupFilePromise = null;
   async function ensureBackupFile() {
     if (backupFileId) return backupFileId;
-    await ensureFolder();
-    const q = encodeURIComponent(`name='${ARCHIVO_BACKUP}' and '${folderId}' in parents and trashed=false`);
-    const resp = await api(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)`);
-    const data = await resp.json();
-    if (data.files && data.files.length) { backupFileId = data.files[0].id; return backupFileId; }
+    if (_backupFilePromise) return _backupFilePromise; // ídem: evita crear el archivo dos veces en paralelo
+    _backupFilePromise = (async () => {
+      await ensureFolder();
+      const q = encodeURIComponent(`name='${ARCHIVO_BACKUP}' and '${folderId}' in parents and trashed=false`);
+      const resp = await api(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)`);
+      const data = await resp.json();
+      if (data.files && data.files.length) { backupFileId = data.files[0].id; return backupFileId; }
 
-    // Archivo no existe: se crea vacío
-    backupFileId = await subirJSON({}, true);
-    return backupFileId;
+      // Archivo no existe: se crea vacío
+      backupFileId = await subirJSON({}, true);
+      return backupFileId;
+    })();
+    try { return await _backupFilePromise; } finally { _backupFilePromise = null; }
   }
 
   async function subirJSON(obj, creando = false) {
