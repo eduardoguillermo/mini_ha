@@ -2,7 +2,7 @@
 
 // ── CONSTANTES ────────────────────────────────────────────────────────────────
 const SKEY = 'mini-ha';
-const VERSION = 'v1.11';
+const VERSION = 'v1.12';
 
 // ── File System Access API ────────────────────────────────────────────────────
 let _dirHandle = null;
@@ -194,6 +194,11 @@ function save(){
     clearTimeout(_folderSaveTimer);
     _folderSaveTimer = setTimeout(()=>mhaGuardarEnCarpeta(), 5000);
   }
+  // Backup Drive con debounce 5s (mismo timing que carpeta, no duplica llamadas)
+  if(typeof DriveSync !== 'undefined' && DriveSync.conectado){
+    clearTimeout(_driveSyncTimer);
+    _driveSyncTimer = setTimeout(()=>mhaSubirDrive(), 5000);
+  }
 }
 
 // ── SNAPSHOTS ─────────────────────────────────────────────────────────────────
@@ -233,12 +238,126 @@ function mhaEliminarSnapshot(ts){
   renderBackup();
 }
 
+// ── MERGE (Drive) por uuid, last-write-wins por lastModified ─────────────────
+function mhaMergeProyectos(remotos){
+  const mapa = new Map();
+  DB.proyectosHA.forEach(p => {
+    if(!p.uuid) p.uuid = mhaNuevoUUID();
+    if(!p.lastModified) p.lastModified = 0;
+    mapa.set(p.uuid, p);
+  });
+  let agregados = 0, actualizados = 0, sinIdentidad = 0;
+  (remotos || []).forEach(rp => {
+    if(!rp.uuid){ sinIdentidad++; return; } // sin identidad estable: no se puede mergear con seguridad
+    const local = mapa.get(rp.uuid);
+    if(!local){
+      mapa.set(rp.uuid, rp);
+      agregados++;
+    } else if((rp.lastModified||0) > (local.lastModified||0)){
+      mapa.set(rp.uuid, rp);
+      actualizados++;
+    }
+  });
+  DB.proyectosHA = Array.from(mapa.values());
+  // Reacomodar el contador local para no colisionar con ids numéricos del otro lado
+  const maxId = DB.proyectosHA.reduce((mx,p)=>Math.max(mx, p.id||0), 0);
+  if(maxId >= DB.nid) DB.nid = maxId + 1;
+  return { agregados, actualizados, sinIdentidad };
+}
+
+// ── DRIVE SYNC ────────────────────────────────────────────────────────────────
+let _driveSyncTimer = null;
+
+function mhaDriveConectar(){
+  if(typeof DriveSync === 'undefined'){ alert('Módulo Drive no cargado.'); return; }
+  DriveSync.init(()=>{
+    mhaActualizarEstadoDrive();
+    renderBackup();
+  });
+  DriveSync.conectar();
+}
+
+function mhaActualizarEstadoDrive(){
+  const el = document.getElementById('mha-drive-status');
+  if(!el) return;
+  if(typeof DriveSync !== 'undefined' && DriveSync.conectado){
+    el.textContent = '☁️ Drive conectado';
+    el.style.color = '#4caf7d';
+  } else {
+    el.textContent = 'Drive no conectado';
+    el.style.color = 'var(--text3)';
+  }
+}
+
+async function mhaSubirDrive(){
+  if(typeof DriveSync === 'undefined' || !DriveSync.conectado) return false;
+  try{
+    await DriveSync.subirBackup(DB);
+    return true;
+  } catch(e){ console.error('subirDrive:', e); return false; }
+}
+
+async function mhaAbrirModalDrive(){
+  if(typeof DriveSync === 'undefined' || !DriveSync.conectado){ alert('Conectá Drive primero.'); return; }
+  try{
+    const remoto = await DriveSync.bajarBackup();
+    if(!remoto || !remoto.proyectosHA){ alert('No hay backup en Drive todavía. Se creará uno al guardar.'); return; }
+    document.getElementById('modal-mha-drive')?.remove();
+    const ov = document.createElement('div');
+    ov.id = 'modal-mha-drive';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,0.7);z-index:3000;display:flex;align-items:center;justify-content:center;';
+    ov.innerHTML = `<div style="background:white;border-radius:10px;padding:24px;min-width:340px;max-width:90vw;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h3 style="margin:0;font-size:16px;">☁️ Backup en Drive</h3>
+        <button onclick="document.getElementById('modal-mha-drive').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;">✕</button>
+      </div>
+      <p style="font-size:11px;color:#64748b;margin:0 0 16px;">🔀 <b>Fusionar</b>: suma los proyectos nuevos/actualizados de Drive a los que ya tenés (recomendado). <b>Reemplazar</b>: borra todo lo local y lo cambia por el backup de Drive.</p>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button onclick="document.getElementById('modal-mha-drive').remove()" style="background:#f1f5f9;color:#334155;border:none;border-radius:4px;padding:6px 14px;font-size:13px;cursor:pointer;">Cancelar</button>
+        <button onclick="mhaDriveReemplazar()" style="background:#0f766e;color:white;border:none;border-radius:4px;padding:6px 14px;font-size:13px;cursor:pointer;">Reemplazar</button>
+        <button onclick="mhaDriveFusionar()" style="background:#4f46e5;color:white;border:none;border-radius:4px;padding:6px 14px;font-size:13px;cursor:pointer;">🔀 Fusionar</button>
+      </div>
+    </div>`;
+    document.body.appendChild(ov);
+    window._mhaRemotoDrive = remoto;
+  } catch(e){ alert('Error al leer Drive: '+e.message); }
+}
+
+async function mhaDriveFusionar(){
+  const remoto = window._mhaRemotoDrive;
+  if(!remoto) return;
+  mhaHacerSnapshot(false);
+  const { agregados, actualizados, sinIdentidad } = mhaMergeProyectos(remoto.proyectosHA);
+  save();
+  document.getElementById('modal-mha-drive')?.remove();
+  renderProyectos();
+  let msg = `✅ Fusión completa: ${agregados} nuevo(s), ${actualizados} actualizado(s)`;
+  if(sinIdentidad) msg += `, ${sinIdentidad} ignorado(s) sin id`;
+  alert(msg);
+}
+
+function mhaDriveReemplazar(){
+  const remoto = window._mhaRemotoDrive;
+  if(!remoto) return;
+  if(!confirm('Esto reemplaza TODOS los datos locales por el backup de Drive. ¿Continuar?')) return;
+  mhaHacerSnapshot(false);
+  DB = remoto;
+  save();
+  document.getElementById('modal-mha-drive')?.remove();
+  goTo('dashboard');
+}
+
 async function mhaSalir(){
   const ok = mhaHacerSnapshot(true);
   if(_dirHandle) await mhaGuardarEnCarpeta();
+  let driveMsg = '';
+  if(typeof DriveSync !== 'undefined' && DriveSync.conectado){
+    const subioDrive = await mhaSubirDrive();
+    driveMsg = subioDrive ? '\n☁️ Backup en Drive actualizado.' : '\n⚠️ No se pudo subir a Drive.';
+  }
   const msg = ok ? '✅ Snapshot guardado.' : '⚠️ No se pudo guardar snapshot.';
   const carpetaMsg = _dirHandle ? `\n📂 Backup en carpeta "${_dirHandle.name}" guardado.` : '';
-  if(confirm(msg + carpetaMsg + '\n¿Cerrar Mini HA?')) window.close();
+  if(confirm(msg + carpetaMsg + driveMsg + '\n¿Cerrar Mini HA?')) window.close();
 }
 
 // ── UTILIDADES ────────────────────────────────────────────────────────────────
@@ -272,9 +391,18 @@ function pctOperaciones(proy){
   return Math.round(hechas / proy.operaciones.length * 100);
 }
 
+function mhaNuevoUUID(){
+  if(crypto.randomUUID) return crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c=>{
+    const r = Math.random()*16|0, v = c==='x'?r:(r&0x3|0x8);
+    return v.toString(16);
+  });
+}
+
 function agregarHistorial(proy, accion){
   if(!proy.historial) proy.historial = [];
   proy.historial.unshift({ fecha: today(), accion });
+  proy.lastModified = Date.now(); // marca de tiempo para merge por uuid/lastModified
 }
 
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -1000,6 +1128,7 @@ function guardarNuevoProy(){
   if(!titulo){ alert('El título es obligatorio.'); return; }
   const p = {
     id:          nextId(),
+    uuid:        mhaNuevoUUID(),
     numero:      nextNumeroProy(),
     titulo,
     objetivo:    document.getElementById('pf-objetivo').value.trim(),
@@ -1852,11 +1981,14 @@ function renderBackup(){
     <div class="ch"><span class="ct">Backup Mini HA</span></div>
     <div class="card-body">
       <p class="text2" style="font-size:12px;margin-bottom:8px">Exportá o restaurá todos los datos de Mini HA.</p>
-      <p id="mha-carpeta-status" style="font-size:11px;margin-bottom:12px;color:var(--text3)">Sin carpeta vinculada</p>
+      <p id="mha-carpeta-status" style="font-size:11px;margin-bottom:4px;color:var(--text3)">Sin carpeta vinculada</p>
+      <p id="mha-drive-status" style="font-size:11px;margin-bottom:12px;color:var(--text3)">Drive no conectado</p>
       <div style="display:flex;flex-wrap:wrap;gap:8px;">
         <button class="btn btn-p" onclick="exportarBackup()">⬇️ Exportar JSON</button>
         <button class="btn" onclick="mhaSeleccionarCarpeta().then(()=>renderBackup())" style="background:#15803d;color:white;border-color:#15803d">📂 Carpeta</button>
         <button class="btn" onclick="mhaHacerSnapshot(true);renderBackup()" style="background:#0284c7;color:white;border-color:#0284c7">📸 Snapshot</button>
+        <button class="btn" onclick="mhaDriveConectar()" style="background:#4f46e5;color:white;border-color:#4f46e5">☁️ Conectar Drive</button>
+        ${(typeof DriveSync !== 'undefined' && DriveSync.conectado) ? `<button class="btn" onclick="mhaAbrirModalDrive()" style="background:#0891b2;color:white;border-color:#0891b2">☁️ Backups en Drive</button>` : ''}
       </div>
     </div>
   </div>
@@ -2054,14 +2186,18 @@ document.addEventListener('DOMContentLoaded', function(){
   load();
   goTo('dashboard');
   mhaRestaurarCarpetaGuardada();
+  if(typeof DriveSync !== 'undefined'){
+    DriveSync.init(()=>mhaActualizarEstadoDrive()); // silencioso: solo si hay token guardado vigente
+  }
   const navVer = document.getElementById('nav-version');
   if(navVer) navVer.textContent = VERSION;
 
-  // Safe-close: snapshot automático + backup carpeta
+  // Safe-close: snapshot automático + backup carpeta + Drive
   document.addEventListener('visibilitychange', ()=>{
     if(document.visibilityState === 'hidden'){
       mhaHacerSnapshot(false);
       if(_dirHandle) mhaGuardarEnCarpeta();
+      if(typeof DriveSync !== 'undefined' && DriveSync.conectado) mhaSubirDrive();
     }
   });
   window.addEventListener('beforeunload', ()=>{ mhaHacerSnapshot(false); });
