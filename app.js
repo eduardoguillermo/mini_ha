@@ -2,7 +2,7 @@
 
 // ── CONSTANTES ────────────────────────────────────────────────────────────────
 const SKEY = 'mini-ha';
-const VERSION = 'v1.17';
+const VERSION = 'v1.18';
 
 // ── File System Access API ────────────────────────────────────────────────────
 let _dirHandle = null;
@@ -297,6 +297,24 @@ async function mhaSubirDrive(keepalive = false){
     await DriveSync.subirBackup(DB, keepalive);
     return true;
   } catch(e){ console.error('subirDrive:', e); return false; }
+}
+
+async function mhaBackupManualDrive(ev){
+  const btn = ev?.target;
+  const textoOriginal = btn ? btn.textContent : null;
+  if(btn){ btn.disabled = true; btn.textContent = '⏳ Subiendo...'; }
+  const ok = await mhaSubirDrive();
+  if(btn){ btn.disabled = false; btn.textContent = textoOriginal; }
+  if(ok){
+    const el = document.getElementById('mha-drive-status');
+    if(el){
+      const ahora = new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+      el.textContent = `☁️ Drive conectado · backup subido ${ahora}`;
+      el.style.color = '#4caf7d';
+    }
+  } else {
+    alert('⚠️ No se pudo subir el backup a Drive. Revisá la conexión.');
+  }
 }
 
 async function mhaAbrirModalDrive(){
@@ -1996,6 +2014,7 @@ function renderBackup(){
         <button class="btn" onclick="mhaSeleccionarCarpeta().then(()=>renderBackup())" style="background:#15803d;color:white;border-color:#15803d">📂 Carpeta</button>
         <button class="btn" onclick="mhaHacerSnapshot(true);renderBackup()" style="background:#0284c7;color:white;border-color:#0284c7">📸 Snapshot</button>
         <button class="btn" onclick="mhaDriveConectar()" style="background:#4f46e5;color:white;border-color:#4f46e5">☁️ Conectar Drive</button>
+        ${(typeof DriveSync !== 'undefined' && DriveSync.conectado) ? `<button class="btn" onclick="mhaBackupManualDrive(event)" style="background:#0d9488;color:white;border-color:#0d9488">☁️ Backup ahora</button>` : ''}
         ${(typeof DriveSync !== 'undefined' && DriveSync.conectado) ? `<button class="btn" onclick="mhaAbrirModalDrive()" style="background:#0891b2;color:white;border-color:#0891b2">☁️ Backups en Drive</button>` : ''}
         <input type="file" id="bk-file" accept=".json" style="display:none" onchange="importarBackup(event)">
         <button class="btn btn-d" onclick="document.getElementById('bk-file').click()">⬆️ Restaurar backup</button>
