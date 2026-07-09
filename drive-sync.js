@@ -1,4 +1,4 @@
-/* drive-sync.js — v1.0.0
+/* drive-sync.js — v1.1.0
    Sincroniza el backup de Mini HA contra una carpeta visible "MiniHA" en Drive.
    Mismo patrón que Stock en Casa (drive-sync.js) y mismo Client ID de OAuth
    que el resto del ecosistema de PWAs.
@@ -49,7 +49,8 @@ const DriveSync = (() => {
           guardarToken(accessToken, resp.expires_in || 3600);
           programarRenovacion();
           if (onReady) onReady();
-        }
+        },
+        error_callback: (err) => { log('Intento de token falló (silencioso):', err && err.type); }
       });
     }
     // Si ya hay un token vigente guardado, lo reusamos sin pedir nada
@@ -58,6 +59,12 @@ const DriveSync = (() => {
       accessToken = guardado;
       programarRenovacion();
       if (onReady) onReady();
+    } else if (localStorage.getItem(TOKEN_KEY)) {
+      // Hubo token antes pero venció: renovación silenciosa recién ahora,
+      // que tokenClient ya existe (antes conectar() corría con tokenClient=null
+      // porque GIS carga async y perdía la carrera → nunca se reconectaba).
+      // Si nunca hubo token, no se intenta nada: el usuario conecta manualmente.
+      tokenClient.requestAccessToken({ prompt: '' });
     }
   }
 
@@ -138,7 +145,7 @@ const DriveSync = (() => {
     try { return await _backupFilePromise; } finally { _backupFilePromise = null; }
   }
 
-  async function subirJSON(obj, creando = false) {
+  async function subirJSON(obj, creando = false, keepalive = false) {
     await ensureFolder();
     const boundary = 'miniha_boundary';
     const metadata = creando
@@ -152,19 +159,24 @@ const DriveSync = (() => {
       ? 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart'
       : `https://www.googleapis.com/upload/drive/v3/files/${backupFileId}?uploadType=multipart`;
 
-    const resp = await api(url, {
+    const opts = {
       method: creando ? 'POST' : 'PATCH',
       headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
       body
-    });
+    };
+    // keepalive: solo con body chico (límite del navegador ~64KB; si se excede,
+    // fetch tira error de entrada y NO subiría nada — peor que sin keepalive)
+    if (keepalive && body.length < 60000) opts.keepalive = true;
+
+    const resp = await api(url, opts);
     const data = await resp.json();
     return data.id;
   }
 
   // ---------- Backup completo (DB entero: proyectos + catálogo VSS + config) ----------
-  async function subirBackup(datosCompletos) {
+  async function subirBackup(datosCompletos, keepalive = false) {
     await ensureBackupFile();
-    await subirJSON(datosCompletos);
+    await subirJSON(datosCompletos, false, keepalive);
   }
 
   async function bajarBackup() {
