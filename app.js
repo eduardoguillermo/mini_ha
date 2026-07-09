@@ -2,7 +2,7 @@
 
 // ── CONSTANTES ────────────────────────────────────────────────────────────────
 const SKEY = 'mini-ha';
-const VERSION = 'v1.13';
+const VERSION = 'v1.14';
 
 // ── File System Access API ────────────────────────────────────────────────────
 let _dirHandle = null;
@@ -2190,6 +2190,7 @@ document.addEventListener('DOMContentLoaded', function(){
   mhaRestaurarCarpetaGuardada();
   if(typeof DriveSync !== 'undefined'){
     DriveSync.init(()=>mhaActualizarEstadoDrive()); // silencioso: solo si hay token guardado vigente
+    DriveSync.conectar(); // si el token venció, intenta renovarlo en silencio (sin popup) igual
   }
   const navVer = document.getElementById('nav-version');
   if(navVer) navVer.textContent = VERSION;
