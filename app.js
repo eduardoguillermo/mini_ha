@@ -2,7 +2,7 @@
 
 // ── CONSTANTES ────────────────────────────────────────────────────────────────
 const SKEY = 'mini-ha';
-const VERSION = 'v1.14';
+const VERSION = 'v1.15';
 
 // ── File System Access API ────────────────────────────────────────────────────
 let _dirHandle = null;
@@ -155,6 +155,7 @@ const ESTADO_PILL = {
 let DB = {
   nid: 1,
   proyectosHA: [],
+  instalaciones: [],  // registro de instalaciones HA (Nabu Casa, credenciales, IPs)
   catalogoVSS: [],   // componentes importados desde VSS Logística
   config: {
     categorias: ['Automatización','Hardware','Mantenimiento','Integración','Bug fix','Dashboard','Red','Otro'],
@@ -168,6 +169,7 @@ function load(){
     if(raw) DB = JSON.parse(raw);
     if(!DB.nid)         DB.nid = 1;
     if(!DB.proyectosHA) DB.proyectosHA = [];
+    if(!DB.instalaciones) DB.instalaciones = [];
     if(!DB.catalogoVSS) DB.catalogoVSS = [];
     if(!DB.config)      DB.config = {};
     if(!DB.config.categorias)  DB.config.categorias = ['Automatización','Hardware','Mantenimiento','Integración','Bug fix','Dashboard','Red','Otro'];
@@ -413,7 +415,7 @@ function btnAyuda(ancla) {
 }
 
 // ── NAVEGACIÓN ────────────────────────────────────────────────────────────────
-const PANELS = ['dashboard','proyectos','proy-ficha','reportes','stock','config','backup'];
+const PANELS = ['dashboard','proyectos','proy-ficha','reportes','stock','instalaciones','inst-ficha','config','backup'];
 let _panel = 'dashboard';
 let _proyActual = null; // id del subproyecto abierto
 
@@ -439,7 +441,7 @@ function goTo(panel, extra){
     const el = document.getElementById('nav-'+p);
     if(el) el.classList.remove('on');
   });
-  const navKey = panel === 'proy-ficha' ? 'proyectos' : panel;
+  const navKey = panel === 'proy-ficha' ? 'proyectos' : (panel === 'inst-ficha' ? 'instalaciones' : panel);
   const navEl = document.getElementById('nav-'+navKey);
   if(navEl) navEl.classList.add('on');
 
@@ -449,6 +451,8 @@ function goTo(panel, extra){
     'proy-ficha': 'Subproyecto',
     'reportes':   'Reportes',
     'stock':      'Stock VSS',
+    'instalaciones': 'Instalaciones HA',
+    'inst-ficha': 'Instalación',
     'config':     'Configuración',
     'backup':     'Backup / Restaurar'
   };
@@ -458,6 +462,8 @@ function goTo(panel, extra){
     'proy-ficha': 'ficha',
     'reportes':   'reportes',
     'stock':      'stock',
+    'instalaciones': 'instalaciones',
+    'inst-ficha': 'instalaciones',
     'config':     'config',
     'backup':     'backup'
   };
@@ -469,6 +475,8 @@ function goTo(panel, extra){
     'proy-ficha': () => renderFicha(_proyActual),
     'reportes':   renderReportes,
     'stock':      renderStock,
+    'instalaciones': renderInstalaciones,
+    'inst-ficha': () => renderInstFicha(_instActual),
     'config':     renderConfig,
     'backup':     renderBackup
   };
@@ -2177,6 +2185,540 @@ function mostrarModalPendientes(){
 function cerrarPendientes(){
   const el = document.getElementById('modal-pendientes');
   if(el) el.remove();
+}
+
+// ── INSTALACIONES HA ──────────────────────────────────────────────────────────
+let _instActual = null;
+let _instFiltro = { q: '', tag: 'todas' };
+let _instPwVis = {};        // claves 'coleccion:id' con password visible
+let _instSecClosed = {};    // secciones colapsadas en la ficha
+let _instDevQ = '';         // filtro de dispositivos en la ficha
+
+const INST_ESTADOS = ['Activa','Mantenimiento','Baja'];
+const INST_ESTADO_PILL = { 'Activa':'p-fin', 'Mantenimiento':'p-pausado', 'Baja':'p-cancel' };
+const INST_CRED_TIPOS = ['Token','Password','Código PIN','API Key','Otro'];
+
+function instGet(id){ return DB.instalaciones.find(i => i.id === id); }
+
+function instLog(inst, accion){
+  if(!inst.historial) inst.historial = [];
+  const d = new Date();
+  const fecha = d.toLocaleDateString('es-AR') + ' · ' + d.toTimeString().slice(0,5);
+  inst.historial.unshift({ fecha, accion });
+}
+
+function instFmtFecha(iso){
+  if(!iso) return '—';
+  const p = String(iso).split('-');
+  return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : iso;
+}
+
+function instVencInfo(iso){
+  if(!iso) return null;
+  const dias = Math.floor((new Date(iso+'T00:00:00') - new Date()) / 86400000);
+  if(dias < 0)   return { txt: `venció ${instFmtFecha(iso)}`, color: '#f85149' };
+  if(dias <= 60) return { txt: `vence ${instFmtFecha(iso)} (${dias} días) ⚠️`, color: '#d29922' };
+  return { txt: `vence ${instFmtFecha(iso)}`, color: '#3fb950' };
+}
+
+function instTagPill(etq){
+  return etq === 'personal'
+    ? '<span class="pill" style="background:rgba(167,139,250,.12);color:#a78bfa;border:1px solid rgba(167,139,250,.3)">PERSONAL</span>'
+    : '<span class="pill" style="background:rgba(38,198,218,.12);color:#26c6da;border:1px solid rgba(38,198,218,.3)">CLIENTE</span>';
+}
+
+// ── Passwords: mostrar / ocultar / copiar ──
+function instPwHTML(key, valor){
+  if(!valor) return '<span class="text3">—</span>';
+  const vis = !!_instPwVis[key];
+  const shown = vis ? esc(valor) : '••••••••';
+  return `<span style="font-family:monospace;letter-spacing:${vis?'0':'2px'}">${shown}</span>
+    <button class="btn btn-sm" style="padding:1px 6px" onclick="event.stopPropagation();instTogglePw('${key}')" title="${vis?'Ocultar':'Mostrar'}">${vis?'🙈':'👁'}</button>
+    <button class="btn btn-sm" style="padding:1px 6px" onclick="event.stopPropagation();instCopiar('${key}',this)" title="Copiar">📋</button>`;
+}
+
+function instTogglePw(key){
+  _instPwVis[key] = !_instPwVis[key];
+  renderInstFicha(_instActual);
+}
+
+function instValorPorKey(key){
+  const inst = instGet(_instActual);
+  if(!inst) return '';
+  const [coll, id, campo] = key.split(':');
+  if(coll === 'red')  return inst.red ? (inst.red.wifiPass || '') : '';
+  const item = (inst[coll] || []).find(x => String(x.id) === id);
+  return item ? (item[campo] || '') : '';
+}
+
+function instCopiar(key, btn){
+  const val = instValorPorKey(key);
+  if(!val) return;
+  navigator.clipboard.writeText(val).then(() => {
+    if(btn){ const t = btn.textContent; btn.textContent = '✓'; setTimeout(()=>{ btn.textContent = t; }, 1000); }
+  }).catch(() => alert('No se pudo copiar'));
+}
+
+// ── LISTADO ──
+function renderInstalaciones(){
+  document.getElementById('pacts').innerHTML =
+    `<button class="btn btn-p btn-sm" onclick="instNueva()">+ Nueva instalación</button>`;
+
+  const q = _instFiltro.q.toLowerCase();
+  let lista = DB.instalaciones.filter(i => {
+    if(_instFiltro.tag === 'personal' && i.etiqueta !== 'personal') return false;
+    if(_instFiltro.tag === 'cliente'  && i.etiqueta !== 'cliente')  return false;
+    if(_instFiltro.tag === 'activa'   && i.estado   !== 'Activa')   return false;
+    if(!q) return true;
+    const txt = [i.nombre, i.ubicacion, i.red && i.red.ipLocal].join(' ').toLowerCase();
+    return txt.includes(q);
+  });
+
+  const chips = [['todas','Todas'],['personal','Personal'],['cliente','Clientes'],['activa','Activas']]
+    .map(([v,l]) => `<button class="btn btn-sm" style="${_instFiltro.tag===v?'border-color:var(--primary);color:var(--primary-light)':''}" onclick="_instFiltro.tag='${v}';renderInstalaciones()">${l}</button>`).join('');
+
+  const cards = lista.map(i => {
+    const venc = i.nabucasa && i.nabucasa.activo
+      ? (instVencInfo(i.nabucasa.vencimiento) || { txt:'sin fecha de vencimiento', color:'var(--text3)' })
+      : { txt: 'Sin Nabu Casa (solo local)', color: 'var(--text3)' };
+    return `<div class="proy-card" onclick="abrirInstalacion(${i.id})">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap">
+        <div class="proy-card-title" style="margin:0;flex:1">${esc(i.nombre)}</div>
+        ${instTagPill(i.etiqueta)}
+        <span class="pill ${INST_ESTADO_PILL[i.estado]||'p-cancel'}">${esc(i.estado||'—')}</span>
+      </div>
+      <div style="font-size:11.5px;color:var(--text2);display:flex;flex-direction:column;gap:3px">
+        <div style="display:flex;justify-content:space-between"><span>IP local</span><span style="font-family:monospace;color:var(--text)">${esc(i.red&&i.red.ipLocal||'—')}</span></div>
+        <div style="display:flex;justify-content:space-between"><span>Equipo</span><span style="color:var(--text)">${esc(i.equipo||'—')}</span></div>
+        <div style="display:flex;justify-content:space-between"><span>HA Core</span><span style="font-family:monospace;color:var(--text)">${esc(i.versionCore||'—')}</span></div>
+        <div style="display:flex;justify-content:space-between"><span>Integraciones</span><span style="color:var(--text)">${(i.integraciones||[]).length}</span></div>
+      </div>
+      <div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);font-size:11px;color:${venc.color}">☁️ ${esc(venc.txt)}</div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('content').innerHTML = `
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
+      <input style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" style="flex:1;min-width:180px" placeholder="🔍 Buscar por nombre, ubicación o IP..."
+        value="${esc(_instFiltro.q)}" oninput="_instFiltro.q=this.value;renderInstalaciones()">
+      ${chips}
+    </div>
+    ${lista.length ? `<div class="proy-grid">${cards}</div>`
+      : `<div class="empty">Sin instalaciones${DB.instalaciones.length?' que coincidan con el filtro':''}.<br><br><button class="btn btn-p" onclick="instNueva()">+ Crear la primera</button></div>`}`;
+}
+
+function abrirInstalacion(id){
+  _instActual = id;
+  _instPwVis = {};
+  _instDevQ = '';
+  goTo('inst-ficha');
+}
+
+// ── FICHA ──
+function instSec(key, titulo, badge, bodyHTML){
+  const closed = !!_instSecClosed[key];
+  return `<div class="card">
+    <div class="ch" style="cursor:pointer" onclick="_instSecClosed['${key}']=!_instSecClosed['${key}'];renderInstFicha(_instActual)">
+      <div class="ct">${titulo}</div>
+      <div style="font-size:11px;color:var(--text3)">${badge||''} ${closed?'▸':'▾'}</div>
+    </div>
+    ${closed ? '' : `<div class="card-body">${bodyHTML}</div>`}
+  </div>`;
+}
+
+function instFld(label, valor, mono){
+  return `<div style="padding:4px 0">
+    <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em">${label}</div>
+    <div style="font-size:13px;margin-top:2px;${mono?'font-family:monospace':''}">${valor || '<span class="text3">—</span>'}</div>
+  </div>`;
+}
+
+function instFiltrarDevs(v){
+  _instDevQ = v;
+  renderInstFicha(_instActual);
+  const x = document.getElementById('inst-dev-q');
+  if(x){ x.focus(); x.setSelectionRange(x.value.length, x.value.length); }
+}
+
+function renderInstFicha(id){
+  const i = instGet(id);
+  if(!i){ goTo('instalaciones'); return; }
+  document.getElementById('ptitle').innerHTML = esc(i.nombre) + btnAyuda('instalaciones');
+  document.getElementById('pacts').innerHTML = `
+    <button class="btn btn-sm" onclick="goTo('instalaciones')">← Volver</button>
+    <button class="btn btn-sm" onclick="instEditar(${i.id})">✏️ Editar</button>
+    <button class="btn btn-sm" style="color:#f85149" onclick="instEliminar(${i.id})">🗑️</button>`;
+
+  const g2 = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:2px 20px';
+
+  // Datos generales
+  const secGeneral = instSec('gen', '📋 Datos generales', '', `<div style="${g2}">
+    ${instFld('Etiqueta / Estado', instTagPill(i.etiqueta) + ' <span class="pill '+(INST_ESTADO_PILL[i.estado]||'p-cancel')+'">'+esc(i.estado||'—')+'</span>')}
+    ${instFld('Ubicación', esc(i.ubicacion))}
+    ${instFld('Fecha instalación', instFmtFecha(i.fechaInstalacion))}
+    ${instFld('Equipo', esc(i.equipo))}
+    ${instFld('HA OS / Core', esc(i.versionOS||'—') + ' / ' + esc(i.versionCore||'—'), true)}
+  </div>`);
+
+  // Acceso y red
+  const r = i.red || {};
+  const n = i.nabucasa || {};
+  const venc = n.activo ? instVencInfo(n.vencimiento) : null;
+  const usuarios = (i.usuarios||[]).map(u => `<tr>
+      <td>${esc(u.nombre)}</td><td>${esc(u.rol)}</td>
+      <td>${instPwHTML('usuarios:'+u.id+':pass', u.pass)}</td>
+      <td style="text-align:right;white-space:nowrap">
+        <button class="btn btn-sm" onclick="instUsuarioModal(${u.id})">✏️</button>
+        <button class="btn btn-sm" style="color:#f85149" onclick="instItemEliminar('usuarios',${u.id})">🗑️</button>
+      </td></tr>`).join('');
+  const secRed = instSec('red', '🌐 Acceso y red', '', `<div style="${g2}">
+    ${instFld('IP local' + (r.ipFija?' (fija)':''), esc(r.ipLocal), true)}
+    ${instFld('MAC', esc(r.mac), true)}
+    ${instFld('Router / Gateway', esc([r.router, r.gateway].filter(Boolean).join(' — ')), true)}
+    ${instFld('SSID / Clave WiFi', r.ssid || r.wifiPass ? esc(r.ssid||'—') + ' · ' + instPwHTML('red:0:wifiPass', r.wifiPass) : '')}
+    ${instFld('Nabu Casa — cuenta', n.activo ? esc(n.cuenta) : '<span class="text3">Sin Nabu Casa</span>')}
+    ${n.activo ? instFld('URL remota', n.url ? '<a href="'+esc(n.url)+'" target="_blank" style="color:var(--primary-light)">'+esc(n.url)+'</a>' : '', true) : ''}
+    ${n.activo && venc ? instFld('Vencimiento suscripción', '<span style="color:'+venc.color+'">'+esc(venc.txt)+'</span>') : ''}
+  </div>
+  <div class="twrap" style="margin-top:10px"><table style="width:100%">
+    <tr><th>Usuario HA</th><th>Rol</th><th>Password</th><th></th></tr>
+    ${usuarios || '<tr><td colspan="4" class="text3" style="padding:8px">Sin usuarios cargados</td></tr>'}
+  </table></div>
+  <button class="btn btn-sm" style="margin-top:8px" onclick="instUsuarioModal()">+ Agregar usuario</button>`);
+
+  // Integraciones
+  const integ = (i.integraciones||[]).map(t => `<tr>
+      <td style="font-weight:600">${esc(t.nombre)}</td><td>${esc(t.tipo)}</td>
+      <td>${t.usuario ? esc(t.usuario) : '<span class="text3">—</span>'}</td>
+      <td>${instPwHTML('integraciones:'+t.id+':pass', t.pass)}</td>
+      <td style="font-size:11.5px;color:var(--text2)">${esc(t.notas)}</td>
+      <td style="text-align:right;white-space:nowrap">
+        <button class="btn btn-sm" onclick="instIntegModal(${t.id})">✏️</button>
+        <button class="btn btn-sm" style="color:#f85149" onclick="instItemEliminar('integraciones',${t.id})">🗑️</button>
+      </td></tr>`).join('');
+  const secInteg = instSec('integ', '🧩 Integraciones', (i.integraciones||[]).length,
+    `<div class="twrap"><table style="width:100%">
+      <tr><th>Integración</th><th>Tipo</th><th>Usuario / Cuenta</th><th>Password</th><th>Notas</th><th></th></tr>
+      ${integ || '<tr><td colspan="6" class="text3" style="padding:8px">Sin integraciones cargadas</td></tr>'}
+    </table></div>
+    <button class="btn btn-sm" style="margin-top:8px" onclick="instIntegModal()">+ Agregar integración</button>`);
+
+  // Dispositivos
+  const dq = _instDevQ.toLowerCase();
+  const devs = (i.dispositivos||[]).filter(d =>
+    !dq || [d.nombre,d.integracion,d.ip,d.mac,d.notas].join(' ').toLowerCase().includes(dq)
+  ).map(d => `<tr>
+      <td style="font-weight:600">${esc(d.nombre)}</td><td>${esc(d.integracion)}</td>
+      <td style="font-family:monospace">${esc(d.ip)}</td>
+      <td style="font-family:monospace;font-size:11px">${esc(d.mac)}</td>
+      <td style="font-size:11.5px;color:var(--text2)">${esc(d.notas)}</td>
+      <td style="text-align:right;white-space:nowrap">
+        <button class="btn btn-sm" onclick="instDevModal(${d.id})">✏️</button>
+        <button class="btn btn-sm" style="color:#f85149" onclick="instItemEliminar('dispositivos',${d.id})">🗑️</button>
+      </td></tr>`).join('');
+  const secDevs = instSec('devs', '📡 Dispositivos clave', (i.dispositivos||[]).length,
+    `<input id="inst-dev-q" style="width:100%;margin-bottom:8px;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" placeholder="🔍 Filtrar por nombre, IP o integración..."
+       value="${esc(_instDevQ)}" oninput="instFiltrarDevs(this.value)">
+    <div class="twrap"><table style="width:100%">
+      <tr><th>Dispositivo</th><th>Integración</th><th>IP</th><th>MAC / ID</th><th>Notas</th><th></th></tr>
+      ${devs || '<tr><td colspan="6" class="text3" style="padding:8px">Sin dispositivos'+(dq?' que coincidan':'')+'</td></tr>'}
+    </table></div>
+    <button class="btn btn-sm" style="margin-top:8px" onclick="instDevModal()">+ Agregar dispositivo</button>`);
+
+  // Credenciales
+  const creds = (i.credenciales||[]).map(c => `<tr>
+      <td style="font-weight:600">${esc(c.nombre)}</td><td>${esc(c.tipo)}</td>
+      <td>${instPwHTML('credenciales:'+c.id+':valor', c.valor)}</td>
+      <td style="font-size:11.5px;color:var(--text2)">${esc(c.notas)}</td>
+      <td style="text-align:right;white-space:nowrap">
+        <button class="btn btn-sm" onclick="instCredModal(${c.id})">✏️</button>
+        <button class="btn btn-sm" style="color:#f85149" onclick="instItemEliminar('credenciales',${c.id})">🗑️</button>
+      </td></tr>`).join('');
+  const secCreds = instSec('creds', '🔑 Tokens y credenciales', (i.credenciales||[]).length,
+    `<div class="twrap"><table style="width:100%">
+      <tr><th>Nombre</th><th>Tipo</th><th>Valor</th><th>Notas</th><th></th></tr>
+      ${creds || '<tr><td colspan="5" class="text3" style="padding:8px">Sin credenciales cargadas</td></tr>'}
+    </table></div>
+    <button class="btn btn-sm" style="margin-top:8px" onclick="instCredModal()">+ Agregar credencial</button>`);
+
+  // Notas e historial
+  const hist = (i.historial||[]).slice(0,20).map(h =>
+    `<div style="padding:5px 0;border-bottom:1px solid var(--border)">
+      <div style="font-size:10px;color:var(--text3);font-family:monospace">${esc(h.fecha)}</div>
+      <div style="font-size:12px">${esc(h.accion)}</div></div>`).join('');
+  const secNotas = instSec('notas', '📝 Notas e historial', (i.historial||[]).length, `
+    <textarea style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" style="width:100%;min-height:60px" placeholder="Notas generales de la instalación..."
+      onchange="instGet(_instActual).notas=this.value;save()">${esc(i.notas||'')}</textarea>
+    <div style="margin-top:10px">${hist || '<div class="text3" style="font-size:12px">Sin historial</div>'}</div>
+    ${(i.historial||[]).length > 20 ? '<div class="text3" style="font-size:10px;margin-top:6px">... y '+(i.historial.length-20)+' entradas más</div>' : ''}
+    <button class="btn btn-sm" style="margin-top:8px" onclick="instNotaAgregar()">+ Agregar entrada manual</button>`);
+
+  document.getElementById('content').innerHTML =
+    secGeneral + secRed + secInteg + secDevs + secCreds + secNotas;
+}
+
+// ── ALTA / EDICIÓN de instalación ──
+function instFormHTML(i){
+  i = i || { red:{}, nabucasa:{} };
+  const r = i.red || {}, n = i.nabucasa || {};
+  const opt = (arr, sel) => arr.map(v => `<option ${v===sel?'selected':''}>${v}</option>`).join('');
+  return `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 12px">
+      <div style="grid-column:1/-1"><label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px">Nombre *</label><input style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" id="if-nombre" value="${esc(i.nombre||'')}" placeholder="Ej: Casa Guille, Cliente López"></div>
+      <div><label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px">Etiqueta</label><select style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" id="if-etiqueta">
+        <option value="personal" ${i.etiqueta==='personal'?'selected':''}>Personal</option>
+        <option value="cliente" ${i.etiqueta!=='personal'?'selected':''}>Cliente</option></select></div>
+      <div><label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px">Estado</label><select style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" id="if-estado">${opt(INST_ESTADOS, i.estado||'Activa')}</select></div>
+      <div><label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px">Ubicación</label><input style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" id="if-ubicacion" value="${esc(i.ubicacion||'')}"></div>
+      <div><label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px">Fecha instalación</label><input style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" type="date" id="if-fecha" value="${esc(i.fechaInstalacion||'')}"></div>
+      <div><label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px">Equipo</label><input style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" id="if-equipo" value="${esc(i.equipo||'')}" placeholder="RPi 4, Mini PC N100..."></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div><label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px">HA OS</label><input style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" id="if-vos" value="${esc(i.versionOS||'')}"></div>
+        <div><label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px">HA Core</label><input style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" id="if-vcore" value="${esc(i.versionCore||'')}"></div>
+      </div>
+      <div style="grid-column:1/-1;border-top:1px solid var(--border);margin-top:4px;padding-top:8px;font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em">Red</div>
+      <div><label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px">IP local</label><input style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" id="if-ip" value="${esc(r.ipLocal||'')}" placeholder="192.168.1.50"></div>
+      <div style="display:flex;align-items:flex-end;padding-bottom:6px"><label style="font-size:12px;display:flex;gap:6px;align-items:center"><input type="checkbox" id="if-ipfija" ${r.ipFija?'checked':''}> IP fija</label></div>
+      <div><label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px">MAC</label><input style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" id="if-mac" value="${esc(r.mac||'')}"></div>
+      <div><label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px">Router</label><input style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" id="if-router" value="${esc(r.router||'')}" placeholder="TP-Link AX55"></div>
+      <div><label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px">Gateway</label><input style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" id="if-gw" value="${esc(r.gateway||'')}" placeholder="192.168.1.1"></div>
+      <div><label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px">SSID</label><input style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" id="if-ssid" value="${esc(r.ssid||'')}"></div>
+      <div><label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px">Clave WiFi</label><input style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" type="password" id="if-wifipass" value="${esc(r.wifiPass||'')}"></div>
+      <div style="grid-column:1/-1;border-top:1px solid var(--border);margin-top:4px;padding-top:8px;font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em">Nabu Casa</div>
+      <div style="display:flex;align-items:center"><label style="font-size:12px;display:flex;gap:6px;align-items:center"><input type="checkbox" id="if-nc" ${n.activo?'checked':''}> Tiene Nabu Casa</label></div>
+      <div><label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px">Cuenta (email)</label><input style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" id="if-nccuenta" value="${esc(n.cuenta||'')}"></div>
+      <div><label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px">URL remota</label><input style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" id="if-ncurl" value="${esc(n.url||'')}" placeholder="https://xxxx.ui.nabu.casa"></div>
+      <div><label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px">Vencimiento</label><input style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" type="date" id="if-ncvenc" value="${esc(n.vencimiento||'')}"></div>
+    </div>`;
+}
+
+function instLeerForm(i){
+  i.nombre   = document.getElementById('if-nombre').value.trim();
+  i.etiqueta = document.getElementById('if-etiqueta').value;
+  i.estado   = document.getElementById('if-estado').value;
+  i.ubicacion = document.getElementById('if-ubicacion').value.trim();
+  i.fechaInstalacion = document.getElementById('if-fecha').value;
+  i.equipo   = document.getElementById('if-equipo').value.trim();
+  i.versionOS   = document.getElementById('if-vos').value.trim();
+  i.versionCore = document.getElementById('if-vcore').value.trim();
+  i.red = {
+    ipLocal: document.getElementById('if-ip').value.trim(),
+    ipFija:  document.getElementById('if-ipfija').checked,
+    mac:     document.getElementById('if-mac').value.trim(),
+    router:  document.getElementById('if-router').value.trim(),
+    gateway: document.getElementById('if-gw').value.trim(),
+    ssid:    document.getElementById('if-ssid').value.trim(),
+    wifiPass:document.getElementById('if-wifipass').value
+  };
+  i.nabucasa = {
+    activo: document.getElementById('if-nc').checked,
+    cuenta: document.getElementById('if-nccuenta').value.trim(),
+    url:    document.getElementById('if-ncurl').value.trim(),
+    vencimiento: document.getElementById('if-ncvenc').value
+  };
+}
+
+function instNueva(){
+  abrirModal('🗂️ Nueva instalación', instFormHTML(null),
+    `<button class="btn" onclick="cerrarModal()">Cancelar</button>
+     <button class="btn btn-p" onclick="instGuardarNueva()">Guardar</button>`);
+}
+
+function instGuardarNueva(){
+  const nombre = document.getElementById('if-nombre').value.trim();
+  if(!nombre){ alert('El nombre es obligatorio'); return; }
+  const i = { id: DB.nid++, usuarios:[], integraciones:[], dispositivos:[], credenciales:[], notas:'', historial:[] };
+  instLeerForm(i);
+  instLog(i, 'Instalación creada');
+  DB.instalaciones.push(i);
+  save();
+  cerrarModal();
+  abrirInstalacion(i.id);
+}
+
+function instEditar(id){
+  const i = instGet(id);
+  if(!i) return;
+  abrirModal('✏️ Editar — ' + i.nombre, instFormHTML(i),
+    `<button class="btn" onclick="cerrarModal()">Cancelar</button>
+     <button class="btn btn-p" onclick="instGuardarEdicion(${id})">Guardar</button>`);
+}
+
+function instGuardarEdicion(id){
+  const i = instGet(id);
+  if(!i) return;
+  const nombre = document.getElementById('if-nombre').value.trim();
+  if(!nombre){ alert('El nombre es obligatorio'); return; }
+  instLeerForm(i);
+  instLog(i, 'Datos de la instalación editados');
+  save();
+  cerrarModal();
+  renderInstFicha(id);
+}
+
+function instEliminar(id){
+  const i = instGet(id);
+  if(!i) return;
+  if(!confirm(`¿Eliminar la instalación "${i.nombre}" con todos sus datos? Esta acción no se puede deshacer.`)) return;
+  DB.instalaciones = DB.instalaciones.filter(x => x.id !== id);
+  save();
+  goTo('instalaciones');
+}
+
+// ── ITEMS de colecciones (usuarios / integraciones / dispositivos / credenciales) ──
+function instItemEliminar(coll, itemId){
+  const i = instGet(_instActual);
+  if(!i) return;
+  const item = (i[coll]||[]).find(x => x.id === itemId);
+  if(!item) return;
+  const nombre = item.nombre || '';
+  if(!confirm(`¿Eliminar "${nombre}"?`)) return;
+  i[coll] = i[coll].filter(x => x.id !== itemId);
+  instLog(i, `Eliminado de ${coll}: ${nombre}`);
+  save();
+  renderInstFicha(_instActual);
+}
+
+function instUsuarioModal(uid){
+  const i = instGet(_instActual);
+  const u = uid ? (i.usuarios||[]).find(x => x.id === uid) : null;
+  abrirModal(u ? '✏️ Editar usuario HA' : '👤 Nuevo usuario HA', `
+    <label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px">Nombre de usuario *</label><input style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" id="iu-nombre" value="${esc(u&&u.nombre||'')}">
+    <label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px" style="margin-top:8px">Rol</label><select style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" id="iu-rol">
+      <option ${u&&u.rol==='Usuario'?'selected':''}>Usuario</option>
+      <option ${!u||u.rol==='Admin'?'selected':''}>Admin</option></select>
+    <label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px" style="margin-top:8px">Password</label><input style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" type="password" id="iu-pass" value="${esc(u&&u.pass||'')}">`,
+    `<button class="btn" onclick="cerrarModal()">Cancelar</button>
+     <button class="btn btn-p" onclick="instUsuarioGuardar(${uid||'null'})">Guardar</button>`);
+}
+
+function instUsuarioGuardar(uid){
+  const i = instGet(_instActual);
+  const nombre = document.getElementById('iu-nombre').value.trim();
+  if(!nombre){ alert('El nombre es obligatorio'); return; }
+  const datos = { nombre, rol: document.getElementById('iu-rol').value, pass: document.getElementById('iu-pass').value };
+  if(uid){
+    Object.assign(i.usuarios.find(x => x.id === uid), datos);
+    instLog(i, `Usuario HA editado: ${nombre}`);
+  } else {
+    if(!i.usuarios) i.usuarios = [];
+    i.usuarios.push(Object.assign({ id: DB.nid++ }, datos));
+    instLog(i, `Usuario HA agregado: ${nombre}`);
+  }
+  save(); cerrarModal(); renderInstFicha(_instActual);
+}
+
+function instIntegModal(tid){
+  const i = instGet(_instActual);
+  const t = tid ? (i.integraciones||[]).find(x => x.id === tid) : null;
+  abrirModal(t ? '✏️ Editar integración' : '🧩 Nueva integración', `
+    <label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px">Nombre *</label><input style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" id="it-nombre" value="${esc(t&&t.nombre||'')}" placeholder="Tuya, Sonoff (eWeLink), Tapo, ZHA...">
+    <label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px" style="margin-top:8px">Tipo</label><select style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" id="it-tipo">
+      <option ${!t||t.tipo==='Nativa'?'selected':''}>Nativa</option>
+      <option ${t&&t.tipo==='HACS'?'selected':''}>HACS</option>
+      <option ${t&&t.tipo==='Add-on'?'selected':''}>Add-on</option></select>
+    <label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px" style="margin-top:8px">Usuario / Cuenta (opcional)</label><input style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" id="it-usuario" value="${esc(t&&t.usuario||'')}" placeholder="email de la cuenta cloud">
+    <label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px" style="margin-top:8px">Password (opcional)</label><input style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" type="password" id="it-pass" value="${esc(t&&t.pass||'')}">
+    <label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px" style="margin-top:8px">Notas</label><textarea style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" id="it-notas" rows="2" placeholder="Región, puerto, detalles de config...">${esc(t&&t.notas||'')}</textarea>`,
+    `<button class="btn" onclick="cerrarModal()">Cancelar</button>
+     <button class="btn btn-p" onclick="instIntegGuardar(${tid||'null'})">Guardar</button>`);
+}
+
+function instIntegGuardar(tid){
+  const i = instGet(_instActual);
+  const nombre = document.getElementById('it-nombre').value.trim();
+  if(!nombre){ alert('El nombre es obligatorio'); return; }
+  const datos = {
+    nombre, tipo: document.getElementById('it-tipo').value,
+    usuario: document.getElementById('it-usuario').value.trim(),
+    pass: document.getElementById('it-pass').value,
+    notas: document.getElementById('it-notas').value.trim()
+  };
+  if(tid){
+    Object.assign(i.integraciones.find(x => x.id === tid), datos);
+    instLog(i, `Integración editada: ${nombre}`);
+  } else {
+    if(!i.integraciones) i.integraciones = [];
+    i.integraciones.push(Object.assign({ id: DB.nid++ }, datos));
+    instLog(i, `Integración agregada: ${nombre}`);
+  }
+  save(); cerrarModal(); renderInstFicha(_instActual);
+}
+
+function instDevModal(did){
+  const i = instGet(_instActual);
+  const d = did ? (i.dispositivos||[]).find(x => x.id === did) : null;
+  const integs = (i.integraciones||[]).map(t => t.nombre);
+  abrirModal(d ? '✏️ Editar dispositivo' : '📡 Nuevo dispositivo', `
+    <label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px">Nombre *</label><input style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" id="id-nombre" value="${esc(d&&d.nombre||'')}" placeholder="Riego jardín, Cámara patio...">
+    <label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px" style="margin-top:8px">Integración</label>
+    <input style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" id="id-integ" list="id-integ-list" value="${esc(d&&d.integracion||'')}" placeholder="ESPHome, Tapo, Tuya...">
+    <datalist id="id-integ-list">${integs.map(n => '<option value="'+esc(n)+'">').join('')}</datalist>
+    <label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px" style="margin-top:8px">IP</label><input style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" id="id-ip" value="${esc(d&&d.ip||'')}" placeholder="192.168.1.61">
+    <label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px" style="margin-top:8px">MAC / ID / Modelo</label><input style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" id="id-mac" value="${esc(d&&d.mac||'')}">
+    <label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px" style="margin-top:8px">Notas</label><input style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" id="id-notas" value="${esc(d&&d.notas||'')}">`,
+    `<button class="btn" onclick="cerrarModal()">Cancelar</button>
+     <button class="btn btn-p" onclick="instDevGuardar(${did||'null'})">Guardar</button>`);
+}
+
+function instDevGuardar(did){
+  const i = instGet(_instActual);
+  const nombre = document.getElementById('id-nombre').value.trim();
+  if(!nombre){ alert('El nombre es obligatorio'); return; }
+  const datos = {
+    nombre, integracion: document.getElementById('id-integ').value.trim(),
+    ip: document.getElementById('id-ip').value.trim(),
+    mac: document.getElementById('id-mac').value.trim(),
+    notas: document.getElementById('id-notas').value.trim()
+  };
+  if(did){
+    Object.assign(i.dispositivos.find(x => x.id === did), datos);
+    instLog(i, `Dispositivo editado: ${nombre}`);
+  } else {
+    if(!i.dispositivos) i.dispositivos = [];
+    i.dispositivos.push(Object.assign({ id: DB.nid++ }, datos));
+    instLog(i, `Dispositivo agregado: ${nombre}`);
+  }
+  save(); cerrarModal(); renderInstFicha(_instActual);
+}
+
+function instCredModal(cid){
+  const i = instGet(_instActual);
+  const c = cid ? (i.credenciales||[]).find(x => x.id === cid) : null;
+  abrirModal(c ? '✏️ Editar credencial' : '🔑 Nueva credencial', `
+    <label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px">Nombre *</label><input style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" id="ic-nombre" value="${esc(c&&c.nombre||'')}" placeholder="Token larga duración — Node-RED">
+    <label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px" style="margin-top:8px">Tipo</label><select style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" id="ic-tipo">
+      ${INST_CRED_TIPOS.map(t => '<option '+((c&&c.tipo)===t?'selected':'')+'>'+t+'</option>').join('')}</select>
+    <label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px" style="margin-top:8px">Valor *</label><input style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" type="password" id="ic-valor" value="${esc(c&&c.valor||'')}">
+    <label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px" style="margin-top:8px">Notas</label><textarea style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" id="ic-notas" rows="2" placeholder="Dónde se usa, fecha de creación...">${esc(c&&c.notas||'')}</textarea>`,
+    `<button class="btn" onclick="cerrarModal()">Cancelar</button>
+     <button class="btn btn-p" onclick="instCredGuardar(${cid||'null'})">Guardar</button>`);
+}
+
+function instCredGuardar(cid){
+  const i = instGet(_instActual);
+  const nombre = document.getElementById('ic-nombre').value.trim();
+  const valor  = document.getElementById('ic-valor').value;
+  if(!nombre || !valor){ alert('Nombre y valor son obligatorios'); return; }
+  const datos = { nombre, tipo: document.getElementById('ic-tipo').value, valor, notas: document.getElementById('ic-notas').value.trim() };
+  if(cid){
+    Object.assign(i.credenciales.find(x => x.id === cid), datos);
+    instLog(i, `Credencial editada: ${nombre}`);
+  } else {
+    if(!i.credenciales) i.credenciales = [];
+    i.credenciales.push(Object.assign({ id: DB.nid++ }, datos));
+    instLog(i, `Credencial agregada: ${nombre}`);
+  }
+  save(); cerrarModal(); renderInstFicha(_instActual);
+}
+
+function instNotaAgregar(){
+  const txt = prompt('Entrada de historial:');
+  if(!txt || !txt.trim()) return;
+  const i = instGet(_instActual);
+  instLog(i, txt.trim());
+  save();
+  renderInstFicha(_instActual);
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
