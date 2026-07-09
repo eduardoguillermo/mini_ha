@@ -2,7 +2,7 @@
 
 // ── CONSTANTES ────────────────────────────────────────────────────────────────
 const SKEY = 'mini-ha';
-const VERSION = 'v1.15';
+const VERSION = 'v1.16';
 
 // ── File System Access API ────────────────────────────────────────────────────
 let _dirHandle = null;
@@ -291,10 +291,10 @@ function mhaActualizarEstadoDrive(){
   }
 }
 
-async function mhaSubirDrive(){
+async function mhaSubirDrive(keepalive = false){
   if(typeof DriveSync === 'undefined' || !DriveSync.conectado) return false;
   try{
-    await DriveSync.subirBackup(DB);
+    await DriveSync.subirBackup(DB, keepalive);
     return true;
   } catch(e){ console.error('subirDrive:', e); return false; }
 }
@@ -2731,8 +2731,10 @@ document.addEventListener('DOMContentLoaded', function(){
   goTo('dashboard');
   mhaRestaurarCarpetaGuardada();
   if(typeof DriveSync !== 'undefined'){
-    DriveSync.init(()=>mhaActualizarEstadoDrive()); // silencioso: solo si hay token guardado vigente
-    DriveSync.conectar(); // si el token venció, intenta renovarlo en silencio (sin popup) igual
+    // init() ahora se encarga solo: reusa token vigente, o renueva en silencio
+    // si venció (recién cuando GIS terminó de cargar — antes conectar() corría
+    // demasiado temprano y la renovación nunca ocurría).
+    DriveSync.init(()=>mhaActualizarEstadoDrive());
   }
   const navVer = document.getElementById('nav-version');
   if(navVer) navVer.textContent = VERSION;
@@ -2742,7 +2744,7 @@ document.addEventListener('DOMContentLoaded', function(){
     if(document.visibilityState === 'hidden'){
       mhaHacerSnapshot(false);
       if(_dirHandle) mhaGuardarEnCarpeta();
-      if(typeof DriveSync !== 'undefined' && DriveSync.conectado) mhaSubirDrive();
+      if(typeof DriveSync !== 'undefined' && DriveSync.conectado) mhaSubirDrive(true);
     }
   });
   window.addEventListener('beforeunload', ()=>{ mhaHacerSnapshot(false); });
