@@ -2,7 +2,7 @@
 
 // ── CONSTANTES ────────────────────────────────────────────────────────────────
 const SKEY = 'mini-ha';
-const VERSION = 'v1.16';
+const VERSION = 'v1.17';
 
 // ── File System Access API ────────────────────────────────────────────────────
 let _dirHandle = null;
@@ -1997,6 +1997,8 @@ function renderBackup(){
         <button class="btn" onclick="mhaHacerSnapshot(true);renderBackup()" style="background:#0284c7;color:white;border-color:#0284c7">📸 Snapshot</button>
         <button class="btn" onclick="mhaDriveConectar()" style="background:#4f46e5;color:white;border-color:#4f46e5">☁️ Conectar Drive</button>
         ${(typeof DriveSync !== 'undefined' && DriveSync.conectado) ? `<button class="btn" onclick="mhaAbrirModalDrive()" style="background:#0891b2;color:white;border-color:#0891b2">☁️ Backups en Drive</button>` : ''}
+        <input type="file" id="bk-file" accept=".json" style="display:none" onchange="importarBackup(event)">
+        <button class="btn btn-d" onclick="document.getElementById('bk-file').click()">⬆️ Restaurar backup</button>
       </div>
     </div>
   </div>
@@ -2024,14 +2026,6 @@ function renderBackup(){
     <div class="card-body">
       <p class="text2" style="font-size:12px;margin-bottom:12px">Si la app no refleja los últimos cambios, limpiá el caché y recargá.</p>
       <button class="btn" style="background:#c8960a;color:#fff;border-color:#c8960a" onclick="limpiarCache()">🔄 Limpiar caché y recargar</button>
-    </div>
-  </div>
-  <div class="card">
-    <div class="ch"><span class="ct">Restaurar</span></div>
-    <div class="card-body">
-      <p class="text2" style="font-size:12px;margin-bottom:12px"><strong class="red">Reemplaza todos los datos actuales.</strong></p>
-      <input type="file" id="bk-file" accept=".json" style="display:none" onchange="importarBackup(event)">
-      <button class="btn btn-d" onclick="document.getElementById('bk-file').click()">⬆️ Restaurar backup</button>
     </div>
   </div>`;
   document.getElementById('content').innerHTML = html;
