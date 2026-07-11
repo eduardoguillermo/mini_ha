@@ -2,7 +2,7 @@
 
 // ── CONSTANTES ────────────────────────────────────────────────────────────────
 const SKEY = 'mini-ha';
-const VERSION = 'v1.25';
+const VERSION = 'v1.26';
 
 // ── File System Access API ────────────────────────────────────────────────────
 let _dirHandle = null;
@@ -118,7 +118,7 @@ async function mhaGuardarEnCarpeta(){
       mhaActualizarEstadoCarpeta();
     } else if(perm !== 'granted') return false;
 
-    const hoy    = new Date().toISOString().slice(0,10);
+    const hoy    = today();
     const nombre = `mini-ha_backup_${hoy}.json`;
     const fh     = await _dirHandle.getFileHandle(nombre, { create:true });
     const wr     = await fh.createWritable();
@@ -1443,6 +1443,7 @@ function ejecutarRestauracion(){
     return;
   }
   if(!window._pendingRestore) return;
+  mhaHacerSnapshot(false);
   DB = window._pendingRestore;
   window._pendingRestore = null;
   normalizarDB();
@@ -2030,7 +2031,7 @@ function exportarReporteXLSX(){
     // ancho de columnas
     ws['!cols'] = [8,32,14,16,14,12,12,12,12,20].map(w=>({wch:w}));
     XLSX.utils.book_append_sheet(wb, ws, 'Subproyectos');
-    XLSX.writeFile(wb, `mini-ha-reporte-${new Date().toISOString().slice(0,10)}.xlsx`);
+    XLSX.writeFile(wb, `mini-ha-reporte-${today()}.xlsx`);
   };
   script.onerror = function(){ alert('Error cargando SheetJS. Verificar conexion.'); };
   document.head.appendChild(script);
