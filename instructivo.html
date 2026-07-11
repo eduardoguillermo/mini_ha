@@ -246,6 +246,8 @@
   <a href="#reportes">📈 Reportes</a>
   <a href="#config">⚙️ Configuración</a>
   <a href="#instalaciones">🖥️ Instalaciones HA</a>
+  <a href="#instalaciones-integraciones" style="padding-left:28px;font-size:12.5px">🧩 Integraciones</a>
+  <a href="#instalaciones-dispositivos" style="padding-left:28px;font-size:12.5px">📡 Dispositivos</a>
 
   <div class="section-label">Backup y datos</div>
   <a href="#backup">💾 Backup / Restaurar</a>
@@ -456,7 +458,7 @@
     </div>
     <p>Cada instalación tiene su propia ficha con datos generales, acceso y red, usuarios, Nabu Casa, integraciones y dispositivos clave.</p>
 
-    <h2>🧩 Integraciones</h2>
+    <h2 id="instalaciones-integraciones">🧩 Integraciones</h2>
     <p>Registra cada integración de HA usada en esa instalación (Tuya, ZHA, Sonoff/eWeLink, Telegram, etc.) con estos campos:</p>
     <table>
       <tr><th>Campo</th><th>Uso</th></tr>
@@ -466,9 +468,16 @@
       <tr><td><strong>Password</strong></td><td>Dato sensible — queda oculto como contraseña</td></tr>
       <tr><td><strong>Notas</strong></td><td>Cualquier detalle extra de configuración</td></tr>
     </table>
-    <div class="note">📌 <strong>Ejemplo — Telegram:</strong> Nombre "Telegram", Tipo "Nativa" (la integración <code>telegram_bot</code> es nativa de HA). En <strong>Usuario/Cuenta</strong> poner el nombre del bot (ej: <code>@ViperVSS_bot</code>). En <strong>Password</strong> poner el Bot Token (dato sensible, queda oculto). En <strong>Notas</strong> anotar el/los Chat ID de los destinatarios y cualquier aclaración de configuración (ej: polling vs webhook).</div>
+    <p><strong>Ejemplos de uso:</strong></p>
+    <div class="note">📌 <strong>Telegram</strong> — Nombre "Telegram", Tipo "Nativa" (la integración <code>telegram_bot</code> es nativa de HA). En <strong>Usuario/Cuenta</strong> poner el nombre del bot (ej: <code>@ViperVSS_bot</code>). En <strong>Password</strong> poner el Bot Token (dato sensible, queda oculto). En <strong>Notas</strong> anotar el/los Chat ID de los destinatarios y aclaraciones de config (ej: polling vs webhook, o el bug conocido de IPv6 en HA 2026.3 que afecta a Telegram).</div>
+    <div class="note">📌 <strong>Tuya</strong> — Nombre "Tuya", Tipo "Nativa" (o HACS si se usa Local Tuya). Usuario/Cuenta: email de la cuenta cloud Tuya/Smart Life. Password: la contraseña de esa cuenta. Notas: región del servidor (ej: "Región EU") y qué dispositivos dependen de la nube vs. cuáles están migrados a Local Tuya.</div>
+    <div class="note">📌 <strong>Sonoff (eWeLink)</strong> — Nombre "Sonoff / eWeLink", Tipo "Nativa". Usuario/Cuenta: email de la cuenta eWeLink. Notas: aclarar si los dispositivos están en modo cloud o flasheados con Tasmota/ESPHome (deja de depender de eWeLink).</div>
+    <div class="note">📌 <strong>ZHA (Zigbee Home Automation)</strong> — Nombre "ZHA", Tipo "Nativa". No suele llevar usuario/password. Notas: modelo del coordinador (ej: "Sonoff Zigbee 3.0 Dongle Plus"), puerto USB, y canal Zigbee configurado (para evitar interferencia con el WiFi de 2.4GHz).</div>
+    <div class="note">📌 <strong>ESPHome</strong> — Nombre "ESPHome", Tipo "HACS" o "Add-on" según cómo se instaló. Notas: convención de nombres de los nodos, y si se usa API key/encriptación para la comunicación con los ESP32/ESP8266.</div>
+    <div class="note">📌 <strong>NUT (UPS)</strong> — Nombre "NUT", Tipo "Nativa". Notas: modelo del UPS (ej: "Forza SL-1012UL-A"), IP o dispositivo USB del servidor NUT.</div>
+    <div class="note">📌 <strong>Sensores de stock (Yahoo Finance)</strong> — Nombre "Yahoo Finance", Tipo "HACS". Notas: qué tickers/símbolos se siguen y para qué se usan (ej: dashboard de referencia personal).</div>
 
-    <h2>📡 Dispositivos clave</h2>
+    <h2 id="instalaciones-dispositivos">📡 Dispositivos clave</h2>
     <p>Inventario de dispositivos relevantes de esa instalación, con estos campos:</p>
     <table>
       <tr><th>Campo</th><th>Uso</th></tr>
@@ -481,6 +490,12 @@
       <tr><td><strong>Notas</strong></td><td>Cualquier detalle extra</td></tr>
     </table>
     <div class="note">📌 Los dispositivos Zigbee no tienen IP propia — solo el coordinador (dongle/NUC) la tiene. Por eso el campo IP se oculta al elegir Tipo "Zigbee" y en su lugar se usa la IEEE Address como identificador único.</div>
+    <p><strong>Ejemplos de uso:</strong></p>
+    <div class="note">📌 <strong>Sensor Zigbee</strong> (ej: Aqara temperatura/humedad) — Nombre "Sensor temp. living", Zona "Living", Tipo "🔗 Zigbee", Integración "ZHA" o "Zigbee2MQTT", IP se oculta automáticamente, MAC/IEEE Addr: la dirección de 64 bits del sensor (ej: <code>00:15:8d:00:03:a1:b2:c3</code>), Notas: pila instalada, fecha de cambio.</div>
+    <div class="note">📌 <strong>Enchufe/interruptor Zigbee</strong> (ej: SNZB-04P en sistema perimetral) — mismo patrón: Zona según ubicación física, Tipo "🔗 Zigbee", MAC/IEEE Addr como identificador.</div>
+    <div class="note">📌 <strong>Nodo ESPHome WiFi</strong> (ej: Wemos D1 Mini controlando luz con umbral ajustable) — Nombre "Luz jardín — Wemos", Zona "Jardín", Tipo "📶 WiFi/Ethernet", Integración "ESPHome", IP: la IP local asignada (ej: <code>192.168.1.85</code>), MAC: la MAC física de la placa.</div>
+    <div class="note">📌 <strong>Sensor Mi Flora (BLE vía proxy ESP32)</strong> — Nombre "Mi Flora — maceta X", Zona la ubicación de la planta, Tipo "📶 WiFi/Ethernet" (el dato pasa por el proxy BLE del ESP32, que sí tiene IP/MAC), Notas: aclarar que es sensor BLE reenviado por un proxy, no un nodo WiFi directo.</div>
+    <div class="note">📌 <strong>Broadlink RM4 Pro</strong> — Nombre "Broadlink RM4 Pro", Zona donde está ubicado, Tipo "📶 WiFi/Ethernet", Integración "Broadlink", IP y MAC del dispositivo.</div>
   </section>
 
   <!-- BACKUP -->
