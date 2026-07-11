@@ -2,7 +2,7 @@
 
 // ── CONSTANTES ────────────────────────────────────────────────────────────────
 const SKEY = 'mini-ha';
-const VERSION = 'v1.27';
+const VERSION = 'v1.28';
 
 const ESTADOS_PROY = ['Planificado','En curso','Pausado','Finalizado','Cancelado'];
 const ESTADO_PILL = {
@@ -178,6 +178,12 @@ function mhaDriveConectar(){
     renderBackup();
   });
   DriveSync.conectar();
+}
+
+function mhaDriveReconectar(){
+  if(typeof DriveSync === 'undefined'){ alert('Módulo Drive no cargado.'); return; }
+  if(!confirm('Esto va a pedir autorización de nuevo (podés cambiar de cuenta de Google). ¿Continuar?')) return;
+  DriveSync.forzarReconexion();
 }
 
 function mhaActualizarEstadoDrive(){
@@ -1860,6 +1866,7 @@ function renderBackup(){
         ${(typeof DriveSync !== 'undefined' && DriveSync.conectado) ? `
           <button class="btn" onclick="mhaBackupManualDrive(event)" style="background:#0d9488;color:white;border-color:#0d9488">☁️ Backup ahora</button>
           <button class="btn" onclick="mhaAbrirModalDrive()" style="background:#0891b2;color:white;border-color:#0891b2">☁️ Backups en Drive</button>
+          <button class="btn btn-sm" onclick="mhaDriveReconectar()" title="Forzar reconexión (cambiar de cuenta o resolver error de token)" style="background:transparent;color:var(--text3);border-color:var(--border)">🔄 Reconectar</button>
         ` : `
           <button class="btn" onclick="mhaDriveConectar()" style="background:#4f46e5;color:white;border-color:#4f46e5">☁️ Conectar Drive</button>
         `}
