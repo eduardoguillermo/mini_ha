@@ -245,6 +245,7 @@
   <a href="#stock">📦 Stock VSS</a>
   <a href="#reportes">📈 Reportes</a>
   <a href="#config">⚙️ Configuración</a>
+  <a href="#instalaciones">🖥️ Instalaciones HA</a>
 
   <div class="section-label">Backup y datos</div>
   <a href="#backup">💾 Backup / Restaurar</a>
@@ -442,6 +443,44 @@
       <tr><td>Materiales manuales</td><td>Nombres reutilizables para materiales sin vincular al catálogo VSS</td></tr>
     </table>
     <p>Después de editar, tocar <strong>Guardar todo</strong>.</p>
+  </section>
+
+  <!-- INSTALACIONES HA -->
+  <section class="section" id="instalaciones">
+    <div class="section-header">
+      <span class="section-icon">🖥️</span>
+      <div>
+        <div class="section-title">Instalaciones HA</div>
+        <div class="section-subtitle">Registro de instalaciones de Home Assistant en clientes o en casa propia</div>
+      </div>
+    </div>
+    <p>Cada instalación tiene su propia ficha con datos generales, acceso y red, usuarios, Nabu Casa, integraciones y dispositivos clave.</p>
+
+    <h2>🧩 Integraciones</h2>
+    <p>Registra cada integración de HA usada en esa instalación (Tuya, ZHA, Sonoff/eWeLink, Telegram, etc.) con estos campos:</p>
+    <table>
+      <tr><th>Campo</th><th>Uso</th></tr>
+      <tr><td><strong>Nombre</strong> *</td><td>Nombre de la integración</td></tr>
+      <tr><td><strong>Tipo</strong></td><td>Nativa / HACS / Add-on</td></tr>
+      <tr><td><strong>Usuario / Cuenta</strong></td><td>Cuenta o identificador visible (texto plano)</td></tr>
+      <tr><td><strong>Password</strong></td><td>Dato sensible — queda oculto como contraseña</td></tr>
+      <tr><td><strong>Notas</strong></td><td>Cualquier detalle extra de configuración</td></tr>
+    </table>
+    <div class="note">📌 <strong>Ejemplo — Telegram:</strong> Nombre "Telegram", Tipo "Nativa" (la integración <code>telegram_bot</code> es nativa de HA). En <strong>Usuario/Cuenta</strong> poner el nombre del bot (ej: <code>@ViperVSS_bot</code>). En <strong>Password</strong> poner el Bot Token (dato sensible, queda oculto). En <strong>Notas</strong> anotar el/los Chat ID de los destinatarios y cualquier aclaración de configuración (ej: polling vs webhook).</div>
+
+    <h2>📡 Dispositivos clave</h2>
+    <p>Inventario de dispositivos relevantes de esa instalación, con estos campos:</p>
+    <table>
+      <tr><th>Campo</th><th>Uso</th></tr>
+      <tr><td><strong>Nombre</strong> *</td><td>Nombre del dispositivo</td></tr>
+      <tr><td><strong>Zona</strong></td><td>Ambiente/ubicación (ej: Living, Jardín, Cocina). Se reutiliza: al escribir, sugiere zonas ya cargadas en esa instalación</td></tr>
+      <tr><td><strong>Tipo</strong></td><td>📶 WiFi/Ethernet, 🔗 Zigbee, o ❔ Otro</td></tr>
+      <tr><td><strong>Integración</strong></td><td>ESPHome, Tapo, Tuya, ZHA, Zigbee2MQTT, etc.</td></tr>
+      <tr><td><strong>IP</strong></td><td>Solo aplica a WiFi/Ethernet — se oculta automáticamente si el Tipo es Zigbee</td></tr>
+      <tr><td><strong>MAC / IEEE Addr</strong></td><td>MAC física para WiFi/Ethernet, o IEEE Address (identificador de 64 bits) para Zigbee</td></tr>
+      <tr><td><strong>Notas</strong></td><td>Cualquier detalle extra</td></tr>
+    </table>
+    <div class="note">📌 Los dispositivos Zigbee no tienen IP propia — solo el coordinador (dongle/NUC) la tiene. Por eso el campo IP se oculta al elegir Tipo "Zigbee" y en su lugar se usa la IEEE Address como identificador único.</div>
   </section>
 
   <!-- BACKUP -->
