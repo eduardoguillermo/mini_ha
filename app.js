@@ -2,7 +2,7 @@
 
 // ── CONSTANTES ────────────────────────────────────────────────────────────────
 const SKEY = 'mini-ha';
-const VERSION = 'v1.20';
+const VERSION = 'v1.21';
 
 // ── File System Access API ────────────────────────────────────────────────────
 let _dirHandle = null;
@@ -2421,13 +2421,14 @@ function renderInstFicha(id){
   // Dispositivos
   const dq = _instDevQ.toLowerCase();
   const devs = (i.dispositivos||[]).filter(d =>
-    !dq || [d.nombre,d.integracion,d.tipo,d.ip,d.mac,d.notas].join(' ').toLowerCase().includes(dq)
+    !dq || [d.nombre,d.integracion,d.tipo,d.zona,d.ip,d.mac,d.notas].join(' ').toLowerCase().includes(dq)
   ).map(d => {
     const tipoIcon = d.tipo === 'zigbee' ? '🔗' : (d.tipo === 'wifi' ? '📶' : '❔');
     const tipoTxt  = d.tipo === 'zigbee' ? 'Zigbee' : (d.tipo === 'wifi' ? 'WiFi' : '—');
     return `<tr>
       <td style="font-weight:600">${tipoIcon} ${esc(d.nombre)}</td><td>${esc(d.integracion)}</td>
       <td style="font-size:11px;color:var(--text2)">${tipoTxt}</td>
+      <td style="font-size:11.5px;color:var(--text2)">${d.zona ? esc(d.zona) : '<span class="text3">—</span>'}</td>
       <td style="font-family:monospace">${d.tipo==='zigbee' ? '<span class="text3">—</span>' : esc(d.ip)}</td>
       <td style="font-family:monospace;font-size:11px">${esc(d.mac)}</td>
       <td style="font-size:11.5px;color:var(--text2)">${esc(d.notas)}</td>
@@ -2437,11 +2438,11 @@ function renderInstFicha(id){
       </td></tr>`;
   }).join('');
   const secDevs = instSec('devs', '📡 Dispositivos clave', (i.dispositivos||[]).length,
-    `<input id="inst-dev-q" style="width:100%;margin-bottom:8px;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" placeholder="🔍 Filtrar por nombre, IP, MAC/IEEE o integración..."
+    `<input id="inst-dev-q" style="width:100%;margin-bottom:8px;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" placeholder="🔍 Filtrar por nombre, zona, IP, MAC/IEEE o integración..."
        value="${esc(_instDevQ)}" oninput="instFiltrarDevs(this.value)">
     <div class="twrap"><table style="width:100%">
-      <tr><th>Dispositivo</th><th>Integración</th><th>Tipo</th><th>IP</th><th>MAC / IEEE Addr</th><th>Notas</th><th></th></tr>
-      ${devs || '<tr><td colspan="7" class="text3" style="padding:8px">Sin dispositivos'+(dq?' que coincidan':'')+'</td></tr>'}
+      <tr><th>Dispositivo</th><th>Integración</th><th>Tipo</th><th>Zona</th><th>IP</th><th>MAC / IEEE Addr</th><th>Notas</th><th></th></tr>
+      ${devs || '<tr><td colspan="8" class="text3" style="padding:8px">Sin dispositivos'+(dq?' que coincidan':'')+'</td></tr>'}
     </table></div>
     <button class="btn btn-sm" style="margin-top:8px" onclick="instDevModal()">+ Agregar dispositivo</button>`);
 
@@ -2673,9 +2674,13 @@ function instDevModal(did){
   const i = instGet(_instActual);
   const d = did ? (i.dispositivos||[]).find(x => x.id === did) : null;
   const integs = (i.integraciones||[]).map(t => t.nombre);
+  const zonas = [...new Set((i.dispositivos||[]).map(x => x.zona).filter(Boolean))].sort();
   const tipo = (d && d.tipo) || 'wifi';
   abrirModal(d ? '✏️ Editar dispositivo' : '📡 Nuevo dispositivo', `
     <label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px">Nombre *</label><input style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" id="id-nombre" value="${esc(d&&d.nombre||'')}" placeholder="Riego jardín, Cámara patio...">
+    <label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px" style="margin-top:8px">Zona</label>
+    <input style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" id="id-zona" list="id-zona-list" value="${esc(d&&d.zona||'')}" placeholder="Living, Jardín, Cocina...">
+    <datalist id="id-zona-list">${zonas.map(z => '<option value="'+esc(z)+'">').join('')}</datalist>
     <label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px" style="margin-top:8px">Tipo</label>
     <select style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" id="id-tipo" onchange="instDevTipoChange()">
       <option value="wifi" ${tipo==='wifi'?'selected':''}>📶 WiFi / Ethernet (ESPHome, Tapo, Tuya...)</option>
@@ -2712,6 +2717,7 @@ function instDevGuardar(did){
   const ipEl = document.getElementById('id-ip');
   const datos = {
     nombre, tipo,
+    zona: document.getElementById('id-zona').value.trim(),
     integracion: document.getElementById('id-integ').value.trim(),
     ip: tipo === 'zigbee' ? '' : (ipEl ? ipEl.value.trim() : ''),
     mac: document.getElementById('id-mac').value.trim(),
