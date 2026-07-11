@@ -2,7 +2,7 @@
 
 // ── CONSTANTES ────────────────────────────────────────────────────────────────
 const SKEY = 'mini-ha';
-const VERSION = 'v1.22';
+const VERSION = 'v1.23';
 
 // ── File System Access API ────────────────────────────────────────────────────
 let _dirHandle = null;
@@ -267,6 +267,32 @@ function mhaMergeProyectos(remotos){
   return { agregados, actualizados, sinIdentidad };
 }
 
+function mhaMergeInstalaciones(remotos){
+  if(!DB.instalaciones) DB.instalaciones = [];
+  const mapa = new Map();
+  DB.instalaciones.forEach(i => {
+    if(!i.uuid) i.uuid = mhaNuevoUUID();
+    if(!i.lastModified) i.lastModified = 0;
+    mapa.set(i.uuid, i);
+  });
+  let agregados = 0, actualizados = 0, sinIdentidad = 0;
+  (remotos || []).forEach(ri => {
+    if(!ri.uuid){ sinIdentidad++; return; } // sin identidad estable: no se puede mergear con seguridad
+    const local = mapa.get(ri.uuid);
+    if(!local){
+      mapa.set(ri.uuid, ri);
+      agregados++;
+    } else if((ri.lastModified||0) > (local.lastModified||0)){
+      mapa.set(ri.uuid, ri);
+      actualizados++;
+    }
+  });
+  DB.instalaciones = Array.from(mapa.values());
+  const maxId = DB.instalaciones.reduce((mx,i)=>Math.max(mx, i.id||0), 0);
+  if(maxId >= DB.nid) DB.nid = maxId + 1;
+  return { agregados, actualizados, sinIdentidad };
+}
+
 // ── DRIVE SYNC ────────────────────────────────────────────────────────────────
 let _driveSyncTimer = null;
 
@@ -331,7 +357,7 @@ async function mhaAbrirModalDrive(){
         <h3 style="margin:0;font-size:16px;">☁️ Backup en Drive</h3>
         <button onclick="document.getElementById('modal-mha-drive').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;">✕</button>
       </div>
-      <p style="font-size:11px;color:#64748b;margin:0 0 16px;">🔀 <b>Fusionar</b>: suma los proyectos nuevos/actualizados de Drive a los que ya tenés (recomendado). <b>Reemplazar</b>: borra todo lo local y lo cambia por el backup de Drive.</p>
+      <p style="font-size:11px;color:#64748b;margin:0 0 16px;">🔀 <b>Fusionar</b>: suma los proyectos e instalaciones nuevos/actualizados de Drive a los que ya tenés (recomendado). <b>Reemplazar</b>: borra todo lo local y lo cambia por el backup de Drive.</p>
       <div style="display:flex;gap:8px;justify-content:flex-end;">
         <button onclick="document.getElementById('modal-mha-drive').remove()" style="background:#f1f5f9;color:#334155;border:none;border-radius:4px;padding:6px 14px;font-size:13px;cursor:pointer;">Cancelar</button>
         <button onclick="mhaDriveReemplazar()" style="background:#0f766e;color:white;border:none;border-radius:4px;padding:6px 14px;font-size:13px;cursor:pointer;">Reemplazar</button>
@@ -348,11 +374,14 @@ async function mhaDriveFusionar(){
   if(!remoto) return;
   mhaHacerSnapshot(false);
   const { agregados, actualizados, sinIdentidad } = mhaMergeProyectos(remoto.proyectosHA);
+  const rInst = mhaMergeInstalaciones(remoto.instalaciones);
   save();
   document.getElementById('modal-mha-drive')?.remove();
   renderProyectos();
-  let msg = `✅ Fusión completa: ${agregados} nuevo(s), ${actualizados} actualizado(s)`;
+  let msg = `✅ Fusión completa:\nProyectos: ${agregados} nuevo(s), ${actualizados} actualizado(s)`;
   if(sinIdentidad) msg += `, ${sinIdentidad} ignorado(s) sin id`;
+  msg += `\nInstalaciones: ${rInst.agregados} nueva(s), ${rInst.actualizados} actualizada(s)`;
+  if(rInst.sinIdentidad) msg += `, ${rInst.sinIdentidad} ignorada(s) sin id`;
   alert(msg);
 }
 
@@ -2218,6 +2247,7 @@ function instLog(inst, accion){
   const d = new Date();
   const fecha = d.toLocaleDateString('es-AR') + ' · ' + d.toTimeString().slice(0,5);
   inst.historial.unshift({ fecha, accion });
+  inst.lastModified = Date.now();
 }
 
 function instFmtFecha(iso){
@@ -2552,7 +2582,7 @@ function instNueva(){
 function instGuardarNueva(){
   const nombre = document.getElementById('if-nombre').value.trim();
   if(!nombre){ alert('El nombre es obligatorio'); return; }
-  const i = { id: DB.nid++, usuarios:[], integraciones:[], dispositivos:[], credenciales:[], notas:'', historial:[] };
+  const i = { id: DB.nid++, uuid: mhaNuevoUUID(), usuarios:[], integraciones:[], dispositivos:[], credenciales:[], notas:'', historial:[] };
   instLeerForm(i);
   instLog(i, 'Instalación creada');
   DB.instalaciones.push(i);
