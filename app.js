@@ -2,7 +2,7 @@
 
 // ── CONSTANTES ────────────────────────────────────────────────────────────────
 const SKEY = 'mini-ha';
-const VERSION = 'v1.23';
+const VERSION = 'v1.24';
 
 // ── File System Access API ────────────────────────────────────────────────────
 let _dirHandle = null;
@@ -163,28 +163,32 @@ let DB = {
   }
 };
 
+function normalizarDB(){
+  if(!DB.nid)         DB.nid = 1;
+  if(!DB.proyectosHA) DB.proyectosHA = [];
+  if(!DB.instalaciones) DB.instalaciones = [];
+  if(!DB.catalogoVSS) DB.catalogoVSS = [];
+  if(!DB.config)      DB.config = {};
+  if(!DB.config.categorias)  DB.config.categorias = ['Automatización','Hardware','Mantenimiento','Integración','Bug fix','Dashboard','Red','Otro'];
+  if(!DB.config.empresa)     DB.config.empresa = 'Casa HA';
+  if(!DB.config.materialesManual) DB.config.materialesManual = [];
+  if(!DB.config.rubros)          DB.config.rubros = [];
+  if(!DB.config.plantillas)  DB.config.plantillas = [
+    'Editar configuration.yaml',
+    'Reiniciar Home Assistant',
+    'Probar automatización',
+    'Verificar logs',
+    'Hacer backup de HA',
+    'Actualizar integración',
+    'Documentar cambio'
+  ];
+}
+
 function load(){
   try{
     const raw = localStorage.getItem(SKEY);
     if(raw) DB = JSON.parse(raw);
-    if(!DB.nid)         DB.nid = 1;
-    if(!DB.proyectosHA) DB.proyectosHA = [];
-    if(!DB.instalaciones) DB.instalaciones = [];
-    if(!DB.catalogoVSS) DB.catalogoVSS = [];
-    if(!DB.config)      DB.config = {};
-    if(!DB.config.categorias)  DB.config.categorias = ['Automatización','Hardware','Mantenimiento','Integración','Bug fix','Dashboard','Red','Otro'];
-    if(!DB.config.empresa)     DB.config.empresa = 'Casa HA';
-    if(!DB.config.materialesManual) DB.config.materialesManual = [];
-    if(!DB.config.rubros)          DB.config.rubros = [];
-    if(!DB.config.plantillas)  DB.config.plantillas = [
-      'Editar configuration.yaml',
-      'Reiniciar Home Assistant',
-      'Probar automatización',
-      'Verificar logs',
-      'Hacer backup de HA',
-      'Actualizar integración',
-      'Documentar cambio'
-    ];
+    normalizarDB();
   } catch(e){ console.error('Error load:', e); }
 }
 
@@ -229,6 +233,7 @@ function mhaRestaurarSnapshot(ts){
   if(!confirm('¿Restaurar este snapshot? Se reemplazarán los datos actuales.')) return;
   try{
     DB = JSON.parse(snap.data);
+    normalizarDB();
     save();
     goTo('dashboard');
   } catch(e){ alert('Error al restaurar: '+e.message); }
@@ -391,6 +396,7 @@ function mhaDriveReemplazar(){
   if(!confirm('Esto reemplaza TODOS los datos locales por el backup de Drive. ¿Continuar?')) return;
   mhaHacerSnapshot(false);
   DB = remoto;
+  normalizarDB();
   save();
   document.getElementById('modal-mha-drive')?.remove();
   goTo('dashboard');
@@ -1426,6 +1432,7 @@ function ejecutarRestauracion(){
   if(!window._pendingRestore) return;
   DB = window._pendingRestore;
   window._pendingRestore = null;
+  normalizarDB();
   save();
   cerrarModal();
   alert('Backup restaurado correctamente.');
