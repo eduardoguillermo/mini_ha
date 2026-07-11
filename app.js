@@ -2,7 +2,7 @@
 
 // ── CONSTANTES ────────────────────────────────────────────────────────────────
 const SKEY = 'mini-ha';
-const VERSION = 'v1.19';
+const VERSION = 'v1.20';
 
 // ── File System Access API ────────────────────────────────────────────────────
 let _dirHandle = null;
@@ -2421,22 +2421,27 @@ function renderInstFicha(id){
   // Dispositivos
   const dq = _instDevQ.toLowerCase();
   const devs = (i.dispositivos||[]).filter(d =>
-    !dq || [d.nombre,d.integracion,d.ip,d.mac,d.notas].join(' ').toLowerCase().includes(dq)
-  ).map(d => `<tr>
-      <td style="font-weight:600">${esc(d.nombre)}</td><td>${esc(d.integracion)}</td>
-      <td style="font-family:monospace">${esc(d.ip)}</td>
+    !dq || [d.nombre,d.integracion,d.tipo,d.ip,d.mac,d.notas].join(' ').toLowerCase().includes(dq)
+  ).map(d => {
+    const tipoIcon = d.tipo === 'zigbee' ? '🔗' : (d.tipo === 'wifi' ? '📶' : '❔');
+    const tipoTxt  = d.tipo === 'zigbee' ? 'Zigbee' : (d.tipo === 'wifi' ? 'WiFi' : '—');
+    return `<tr>
+      <td style="font-weight:600">${tipoIcon} ${esc(d.nombre)}</td><td>${esc(d.integracion)}</td>
+      <td style="font-size:11px;color:var(--text2)">${tipoTxt}</td>
+      <td style="font-family:monospace">${d.tipo==='zigbee' ? '<span class="text3">—</span>' : esc(d.ip)}</td>
       <td style="font-family:monospace;font-size:11px">${esc(d.mac)}</td>
       <td style="font-size:11.5px;color:var(--text2)">${esc(d.notas)}</td>
       <td style="text-align:right;white-space:nowrap">
         <button class="btn btn-sm" onclick="instDevModal(${d.id})">✏️</button>
         <button class="btn btn-sm" style="color:#f85149" onclick="instItemEliminar('dispositivos',${d.id})">🗑️</button>
-      </td></tr>`).join('');
+      </td></tr>`;
+  }).join('');
   const secDevs = instSec('devs', '📡 Dispositivos clave', (i.dispositivos||[]).length,
-    `<input id="inst-dev-q" style="width:100%;margin-bottom:8px;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" placeholder="🔍 Filtrar por nombre, IP o integración..."
+    `<input id="inst-dev-q" style="width:100%;margin-bottom:8px;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" placeholder="🔍 Filtrar por nombre, IP, MAC/IEEE o integración..."
        value="${esc(_instDevQ)}" oninput="instFiltrarDevs(this.value)">
     <div class="twrap"><table style="width:100%">
-      <tr><th>Dispositivo</th><th>Integración</th><th>IP</th><th>MAC / ID</th><th>Notas</th><th></th></tr>
-      ${devs || '<tr><td colspan="6" class="text3" style="padding:8px">Sin dispositivos'+(dq?' que coincidan':'')+'</td></tr>'}
+      <tr><th>Dispositivo</th><th>Integración</th><th>Tipo</th><th>IP</th><th>MAC / IEEE Addr</th><th>Notas</th><th></th></tr>
+      ${devs || '<tr><td colspan="7" class="text3" style="padding:8px">Sin dispositivos'+(dq?' que coincidan':'')+'</td></tr>'}
     </table></div>
     <button class="btn btn-sm" style="margin-top:8px" onclick="instDevModal()">+ Agregar dispositivo</button>`);
 
@@ -2668,25 +2673,47 @@ function instDevModal(did){
   const i = instGet(_instActual);
   const d = did ? (i.dispositivos||[]).find(x => x.id === did) : null;
   const integs = (i.integraciones||[]).map(t => t.nombre);
+  const tipo = (d && d.tipo) || 'wifi';
   abrirModal(d ? '✏️ Editar dispositivo' : '📡 Nuevo dispositivo', `
     <label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px">Nombre *</label><input style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" id="id-nombre" value="${esc(d&&d.nombre||'')}" placeholder="Riego jardín, Cámara patio...">
+    <label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px" style="margin-top:8px">Tipo</label>
+    <select style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" id="id-tipo" onchange="instDevTipoChange()">
+      <option value="wifi" ${tipo==='wifi'?'selected':''}>📶 WiFi / Ethernet (ESPHome, Tapo, Tuya...)</option>
+      <option value="zigbee" ${tipo==='zigbee'?'selected':''}>🔗 Zigbee (ZHA / Zigbee2MQTT)</option>
+      <option value="otro" ${tipo==='otro'?'selected':''}>❔ Otro</option>
+    </select>
     <label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px" style="margin-top:8px">Integración</label>
-    <input style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" id="id-integ" list="id-integ-list" value="${esc(d&&d.integracion||'')}" placeholder="ESPHome, Tapo, Tuya...">
+    <input style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" id="id-integ" list="id-integ-list" value="${esc(d&&d.integracion||'')}" placeholder="ESPHome, Tapo, Tuya, ZHA, Zigbee2MQTT...">
     <datalist id="id-integ-list">${integs.map(n => '<option value="'+esc(n)+'">').join('')}</datalist>
-    <label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px" style="margin-top:8px">IP</label><input style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" id="id-ip" value="${esc(d&&d.ip||'')}" placeholder="192.168.1.61">
-    <label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px" style="margin-top:8px">MAC / ID / Modelo</label><input style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" id="id-mac" value="${esc(d&&d.mac||'')}">
+    <div id="id-ip-wrap" style="${tipo==='zigbee'?'display:none':''}">
+      <label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px" style="margin-top:8px">IP</label><input style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" id="id-ip" value="${esc(d&&d.ip||'')}" placeholder="192.168.1.61">
+    </div>
+    <label id="id-mac-label" style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px" style="margin-top:8px">${tipo==='zigbee'?'IEEE Address (MAC Zigbee)':'MAC / ID / Modelo'}</label><input style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" id="id-mac" value="${esc(d&&d.mac||'')}" placeholder="${tipo==='zigbee'?'00:12:4b:00:12:a3:f8:c1':''}">
     <label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px" style="margin-top:8px">Notas</label><input style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" id="id-notas" value="${esc(d&&d.notas||'')}">`,
     `<button class="btn" onclick="cerrarModal()">Cancelar</button>
      <button class="btn btn-p" onclick="instDevGuardar(${did||'null'})">Guardar</button>`);
+}
+
+function instDevTipoChange(){
+  const tipo = document.getElementById('id-tipo').value;
+  const ipWrap = document.getElementById('id-ip-wrap');
+  const macLabel = document.getElementById('id-mac-label');
+  const macInput = document.getElementById('id-mac');
+  if(ipWrap) ipWrap.style.display = tipo === 'zigbee' ? 'none' : '';
+  if(macLabel) macLabel.textContent = tipo === 'zigbee' ? 'IEEE Address (MAC Zigbee)' : 'MAC / ID / Modelo';
+  if(macInput) macInput.placeholder = tipo === 'zigbee' ? '00:12:4b:00:12:a3:f8:c1' : '';
 }
 
 function instDevGuardar(did){
   const i = instGet(_instActual);
   const nombre = document.getElementById('id-nombre').value.trim();
   if(!nombre){ alert('El nombre es obligatorio'); return; }
+  const tipo = document.getElementById('id-tipo').value;
+  const ipEl = document.getElementById('id-ip');
   const datos = {
-    nombre, integracion: document.getElementById('id-integ').value.trim(),
-    ip: document.getElementById('id-ip').value.trim(),
+    nombre, tipo,
+    integracion: document.getElementById('id-integ').value.trim(),
+    ip: tipo === 'zigbee' ? '' : (ipEl ? ipEl.value.trim() : ''),
     mac: document.getElementById('id-mac').value.trim(),
     notas: document.getElementById('id-notas').value.trim()
   };
