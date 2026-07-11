@@ -2,7 +2,7 @@
 
 // ── CONSTANTES ────────────────────────────────────────────────────────────────
 const SKEY = 'mini-ha';
-const VERSION = 'v1.24';
+const VERSION = 'v1.25';
 
 // ── File System Access API ────────────────────────────────────────────────────
 let _dirHandle = null;
@@ -182,13 +182,26 @@ function normalizarDB(){
     'Actualizar integración',
     'Documentar cambio'
   ];
+  // Backfill de uuid/lastModified: registros creados antes de existir el merge
+  // por uuid nunca lo tenían asignado salvo que se ejecutara un Fusionar en ese
+  // dispositivo puntual — eso hacía que al subirlos a Drive sin uuid, cualquier
+  // Fusionar desde otro dispositivo los descartara como "sin identidad".
+  // Se asigna acá, en cada carga, para que quede siempre presente antes de
+  // cualquier backup/subida.
+  DB.proyectosHA.forEach(p => { if(!p.uuid) p.uuid = mhaNuevoUUID(); });
+  DB.instalaciones.forEach(i => { if(!i.uuid) i.uuid = mhaNuevoUUID(); if(!i.lastModified) i.lastModified = 1; });
 }
 
 function load(){
   try{
     const raw = localStorage.getItem(SKEY);
     if(raw) DB = JSON.parse(raw);
+    const antesProy = DB.proyectosHA ? DB.proyectosHA.filter(p=>!p.uuid).length : 0;
+    const antesInst = DB.instalaciones ? DB.instalaciones.filter(i=>!i.uuid).length : 0;
     normalizarDB();
+    // Si se backfillearon uuids nuevos, persistir ya mismo para que el
+    // próximo backup (local o Drive) los incluya sin esperar otra acción.
+    if(antesProy > 0 || antesInst > 0) save();
   } catch(e){ console.error('Error load:', e); }
 }
 
