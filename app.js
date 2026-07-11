@@ -2,7 +2,7 @@
 
 // ── CONSTANTES ────────────────────────────────────────────────────────────────
 const SKEY = 'mini-ha';
-const VERSION = 'v1.21';
+const VERSION = 'v1.22';
 
 // ── File System Access API ────────────────────────────────────────────────────
 let _dirHandle = null;
@@ -429,7 +429,7 @@ function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
 
 // ── HELPER: botón de ayuda contextual ──
 function btnAyuda(ancla) {
-  return `<button onclick="window.open('./instructivo.html#${ancla}','_blank','width=1100,height=750,resizable=yes,scrollbars=yes')" title="Ver ayuda" style="background:#f59e0b;border:none;color:#1e293b;border-radius:50%;width:20px;height:20px;font-size:10px;font-weight:800;cursor:pointer;padding:0;line-height:1;margin-left:8px;flex-shrink:0;vertical-align:middle;box-shadow:0 1px 4px rgba(0,0,0,0.3);">?</button>`;
+  return `<button onclick="event.stopPropagation(); window.open('./instructivo.html#${ancla}','_blank','width=1100,height=750,resizable=yes,scrollbars=yes')" title="Ver ayuda" style="background:#f59e0b;border:none;color:#1e293b;border-radius:50%;width:20px;height:20px;font-size:10px;font-weight:800;cursor:pointer;padding:0;line-height:1;margin-left:8px;flex-shrink:0;vertical-align:middle;box-shadow:0 1px 4px rgba(0,0,0,0.3);">?</button>`;
 }
 
 // ── NAVEGACIÓN ────────────────────────────────────────────────────────────────
@@ -2411,7 +2411,7 @@ function renderInstFicha(id){
         <button class="btn btn-sm" onclick="instIntegModal(${t.id})">✏️</button>
         <button class="btn btn-sm" style="color:#f85149" onclick="instItemEliminar('integraciones',${t.id})">🗑️</button>
       </td></tr>`).join('');
-  const secInteg = instSec('integ', '🧩 Integraciones', (i.integraciones||[]).length,
+  const secInteg = instSec('integ', '🧩 Integraciones' + btnAyuda('instalaciones-integraciones'), (i.integraciones||[]).length,
     `<div class="twrap"><table style="width:100%">
       <tr><th>Integración</th><th>Tipo</th><th>Usuario / Cuenta</th><th>Password</th><th>Notas</th><th></th></tr>
       ${integ || '<tr><td colspan="6" class="text3" style="padding:8px">Sin integraciones cargadas</td></tr>'}
@@ -2437,7 +2437,7 @@ function renderInstFicha(id){
         <button class="btn btn-sm" style="color:#f85149" onclick="instItemEliminar('dispositivos',${d.id})">🗑️</button>
       </td></tr>`;
   }).join('');
-  const secDevs = instSec('devs', '📡 Dispositivos clave', (i.dispositivos||[]).length,
+  const secDevs = instSec('devs', '📡 Dispositivos clave' + btnAyuda('instalaciones-dispositivos'), (i.dispositivos||[]).length,
     `<input id="inst-dev-q" style="width:100%;margin-bottom:8px;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" placeholder="🔍 Filtrar por nombre, zona, IP, MAC/IEEE o integración..."
        value="${esc(_instDevQ)}" oninput="instFiltrarDevs(this.value)">
     <div class="twrap"><table style="width:100%">
