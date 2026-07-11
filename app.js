@@ -2,145 +2,7 @@
 
 // ── CONSTANTES ────────────────────────────────────────────────────────────────
 const SKEY = 'mini-ha';
-const VERSION = 'v1.26';
-
-// ── File System Access API ────────────────────────────────────────────────────
-let _dirHandle = null;
-let _folderSaveTimer = null;
-
-const MHA_IDB_NAME  = 'mini-ha-fs';
-const MHA_IDB_STORE = 'handles';
-const MHA_IDB_KEY   = 'carpeta-backup';
-
-function mhaAbrirIDB(){
-  return new Promise((res,rej)=>{
-    const req = indexedDB.open(MHA_IDB_NAME, 1);
-    req.onupgradeneeded = e => e.target.result.createObjectStore(MHA_IDB_STORE);
-    req.onsuccess = e => res(e.target.result);
-    req.onerror   = e => rej(e.target.error);
-  });
-}
-
-async function mhaGuardarHandleIDB(handle){
-  try{
-    const db = await mhaAbrirIDB();
-    const tx = db.transaction(MHA_IDB_STORE,'readwrite');
-    tx.objectStore(MHA_IDB_STORE).put(handle, MHA_IDB_KEY);
-    await new Promise((res,rej)=>{ tx.oncomplete=res; tx.onerror=rej; });
-    db.close();
-  } catch(e){ console.warn('IDB write:',e); }
-}
-
-async function mhaLeerHandleIDB(){
-  try{
-    const db = await mhaAbrirIDB();
-    const tx = db.transaction(MHA_IDB_STORE,'readonly');
-    const h = await new Promise((res,rej)=>{
-      const r = tx.objectStore(MHA_IDB_STORE).get(MHA_IDB_KEY);
-      r.onsuccess = e => res(e.target.result);
-      r.onerror   = e => rej(e.target.error);
-    });
-    db.close();
-    return h || null;
-  } catch(e){ return null; }
-}
-
-async function mhaRestaurarCarpetaGuardada(){
-  if(!('showDirectoryPicker' in window)) return;
-  const handle = await mhaLeerHandleIDB();
-  if(!handle) return;
-  try{
-    const perm = await handle.queryPermission({ mode:'readwrite' });
-    if(perm === 'granted'){
-      _dirHandle = handle;
-      mhaActualizarEstadoCarpeta();
-    } else if(perm === 'prompt'){
-      // El permiso venció — no se puede re-pedir sin gesto del usuario (requestPermission
-      // falla en silencio si se llama en automático). Se deja pendiente y se avisa
-      // visualmente para que el próximo click en "📂 Carpeta" lo reactive.
-      window._pendingHandle = handle;
-      mhaActualizarEstadoCarpeta();
-    }
-  } catch(e){ console.warn('restaurarCarpeta:',e); }
-}
-
-function mhaActualizarEstadoCarpeta(){
-  const el = document.getElementById('mha-carpeta-status');
-  if(!el) return;
-  if(_dirHandle){
-    el.textContent = '📂 ' + _dirHandle.name;
-    el.style.color = '#4caf7d';
-  } else if(window._pendingHandle){
-    el.textContent = '📂 ' + window._pendingHandle.name + ' · requiere permiso (tocá "Carpeta")';
-    el.style.color = '#b45309';
-  } else {
-    el.textContent = 'Sin carpeta vinculada';
-    el.style.color = 'var(--text3)';
-  }
-}
-
-async function mhaSeleccionarCarpeta(){
-  if(!('showDirectoryPicker' in window)){
-    alert('Tu browser no soporta esta función. Usá Chrome o Brave.');
-    return;
-  }
-  try{
-    if(window._pendingHandle){
-      try{
-        const perm = await window._pendingHandle.requestPermission({ mode:'readwrite' });
-        if(perm === 'granted'){
-          _dirHandle = window._pendingHandle;
-          window._pendingHandle = null;
-          await mhaGuardarHandleIDB(_dirHandle);
-          mhaActualizarEstadoCarpeta();
-          await mhaGuardarEnCarpeta();
-          return;
-        }
-      } catch(ep){}
-      window._pendingHandle = null;
-    }
-    _dirHandle = await window.showDirectoryPicker({ mode:'readwrite' });
-    await mhaGuardarHandleIDB(_dirHandle);
-    mhaActualizarEstadoCarpeta();
-    await mhaGuardarEnCarpeta();
-  } catch(e){
-    if(e.name !== 'AbortError') console.error('seleccionarCarpeta:',e);
-  }
-}
-
-async function mhaGuardarEnCarpeta(){
-  if(!_dirHandle) return false;
-  try{
-    const perm = await _dirHandle.queryPermission({ mode:'readwrite' });
-    if(perm === 'prompt'){
-      const granted = await _dirHandle.requestPermission({ mode:'readwrite' });
-      if(granted !== 'granted') return false;
-      mhaActualizarEstadoCarpeta();
-    } else if(perm !== 'granted') return false;
-
-    const hoy    = today();
-    const nombre = `mini-ha_backup_${hoy}.json`;
-    const fh     = await _dirHandle.getFileHandle(nombre, { create:true });
-    const wr     = await fh.createWritable();
-    await wr.write(JSON.stringify(DB, null, 2));
-    await wr.close();
-    console.log('Backup carpeta guardado:', nombre);
-
-    // Limpiar backups >7 días
-    const limite = new Date();
-    limite.setDate(limite.getDate() - 7);
-    for await (const [name] of _dirHandle.entries()){
-      if(/^mini-ha_backup_\d{4}-\d{2}-\d{2}\.json$/.test(name)){
-        const fechaArch = new Date(name.slice(12,22));
-        if(fechaArch < limite) try{ await _dirHandle.removeEntry(name); } catch(ed){}
-      }
-    }
-    return true;
-  } catch(e){
-    console.error('guardarEnCarpeta:',e.name, e.message);
-    return false;
-  }
-}
+const VERSION = 'v1.27';
 
 const ESTADOS_PROY = ['Planificado','En curso','Pausado','Finalizado','Cancelado'];
 const ESTADO_PILL = {
@@ -208,12 +70,7 @@ function load(){
 function save(){
   try{ localStorage.setItem(SKEY, JSON.stringify(DB)); }
   catch(e){ alert('Error al guardar: '+e.message); }
-  // Backup carpeta con debounce 5s
-  if(_dirHandle){
-    clearTimeout(_folderSaveTimer);
-    _folderSaveTimer = setTimeout(()=>mhaGuardarEnCarpeta(), 5000);
-  }
-  // Backup Drive con debounce 5s (mismo timing que carpeta, no duplica llamadas)
+  // Backup Drive con debounce 5s
   if(typeof DriveSync !== 'undefined' && DriveSync.conectado){
     clearTimeout(_driveSyncTimer);
     _driveSyncTimer = setTimeout(()=>mhaSubirDrive(), 5000);
@@ -417,15 +274,13 @@ function mhaDriveReemplazar(){
 
 async function mhaSalir(){
   const ok = mhaHacerSnapshot(true);
-  if(_dirHandle) await mhaGuardarEnCarpeta();
   let driveMsg = '';
   if(typeof DriveSync !== 'undefined' && DriveSync.conectado){
     const subioDrive = await mhaSubirDrive();
     driveMsg = subioDrive ? '\n☁️ Backup en Drive actualizado.' : '\n⚠️ No se pudo subir a Drive.';
   }
   const msg = ok ? '✅ Snapshot guardado.' : '⚠️ No se pudo guardar snapshot.';
-  const carpetaMsg = _dirHandle ? `\n📂 Backup en carpeta "${_dirHandle.name}" guardado.` : '';
-  if(confirm(msg + carpetaMsg + driveMsg + '\n¿Cerrar Mini HA?')) window.close();
+  if(confirm(msg + driveMsg + '\n¿Cerrar Mini HA?')) window.close();
 }
 
 // ── UTILIDADES ────────────────────────────────────────────────────────────────
@@ -1396,63 +1251,6 @@ function guardarConfig(){
   alert('Configuración guardada.');
 }
 
-// ── BACKUP ────────────────────────────────────────────────────────────────────
-function exportarBackup(){
-  const blob = new Blob([JSON.stringify(DB, null, 2)], {type:'application/json'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'mini-ha-backup-'+today()+'.json';
-  a.click();
-}
-
-function importarBackup(ev){
-  const file = ev.target.files[0];
-  if(!file) return;
-  // Leer el archivo primero, confirmar después
-  const reader = new FileReader();
-  reader.onload = function(e){
-    try{
-      const data = JSON.parse(e.target.result);
-      if(!data.proyectosHA) throw new Error('Archivo invalido');
-      // Modal de confirmacion con palabra clave
-      abrirModal('⚠️ Confirmar restauracion',
-        `<div style="background:#2a1a1a;border:1px solid #c0392b;border-radius:var(--r);padding:12px;margin-bottom:16px;font-size:12px;color:#e07070">
-           Esta accion reemplaza TODOS los datos actuales con el backup.<br>Esta operacion no se puede deshacer.
-         </div>
-         <div class="fg">
-           <label>Escribi <strong>RESTAURAR</strong> para confirmar</label>
-           <input id="confirm-restaurar" placeholder="RESTAURAR" autocomplete="off">
-         </div>`,
-        `<button class="btn" onclick="cerrarModal();document.getElementById('bk-file').value=''">Cancelar</button>
-         <button class="btn" style="background:#c0392b;color:#fff;border-color:#c0392b" onclick="ejecutarRestauracion()">Restaurar</button>`
-      );
-      // Guardar data temporalmente
-      window._pendingRestore = data;
-    } catch(err){
-      alert('Error al leer el archivo: '+err.message);
-    }
-  };
-  reader.readAsText(file);
-}
-
-function ejecutarRestauracion(){
-  const input = document.getElementById('confirm-restaurar');
-  if(!input || input.value.trim() !== 'RESTAURAR'){
-    input.style.borderColor = '#c0392b';
-    input.focus();
-    return;
-  }
-  if(!window._pendingRestore) return;
-  mhaHacerSnapshot(false);
-  DB = window._pendingRestore;
-  window._pendingRestore = null;
-  normalizarDB();
-  save();
-  cerrarModal();
-  alert('Backup restaurado correctamente.');
-  goTo('dashboard');
-}
-
 // ── MATERIALES EN SUBPROYECTO ─────────────────────────────────────────────────
 function costoMaterial(m){
   if(m.costoManual != null) return m.costoManual * m.cant;
@@ -2056,18 +1854,15 @@ function renderBackup(){
   <div class="card">
     <div class="ch"><span class="ct">Backup Mini HA</span></div>
     <div class="card-body">
-      <p class="text2" style="font-size:12px;margin-bottom:8px">Exportá o restaurá todos los datos de Mini HA.</p>
-      <p id="mha-carpeta-status" style="font-size:11px;margin-bottom:4px;color:var(--text3)">Sin carpeta vinculada</p>
+      <p class="text2" style="font-size:12px;margin-bottom:8px">Backup automático en Google Drive de todos los datos de Mini HA.</p>
       <p id="mha-drive-status" style="font-size:11px;margin-bottom:12px;color:var(--text3)">Drive no conectado</p>
       <div style="display:flex;flex-wrap:wrap;gap:8px;">
-        <button class="btn btn-p" onclick="exportarBackup()">⬇️ Exportar JSON</button>
-        <button class="btn" onclick="mhaSeleccionarCarpeta().then(()=>renderBackup())" style="background:#15803d;color:white;border-color:#15803d">📂 Carpeta</button>
-        <button class="btn" onclick="mhaHacerSnapshot(true);renderBackup()" style="background:#0284c7;color:white;border-color:#0284c7">📸 Snapshot</button>
-        <button class="btn" onclick="mhaDriveConectar()" style="background:#4f46e5;color:white;border-color:#4f46e5">☁️ Conectar Drive</button>
-        ${(typeof DriveSync !== 'undefined' && DriveSync.conectado) ? `<button class="btn" onclick="mhaBackupManualDrive(event)" style="background:#0d9488;color:white;border-color:#0d9488">☁️ Backup ahora</button>` : ''}
-        ${(typeof DriveSync !== 'undefined' && DriveSync.conectado) ? `<button class="btn" onclick="mhaAbrirModalDrive()" style="background:#0891b2;color:white;border-color:#0891b2">☁️ Backups en Drive</button>` : ''}
-        <input type="file" id="bk-file" accept=".json" style="display:none" onchange="importarBackup(event)">
-        <button class="btn btn-d" onclick="document.getElementById('bk-file').click()">⬆️ Restaurar backup</button>
+        ${(typeof DriveSync !== 'undefined' && DriveSync.conectado) ? `
+          <button class="btn" onclick="mhaBackupManualDrive(event)" style="background:#0d9488;color:white;border-color:#0d9488">☁️ Backup ahora</button>
+          <button class="btn" onclick="mhaAbrirModalDrive()" style="background:#0891b2;color:white;border-color:#0891b2">☁️ Backups en Drive</button>
+        ` : `
+          <button class="btn" onclick="mhaDriveConectar()" style="background:#4f46e5;color:white;border-color:#4f46e5">☁️ Conectar Drive</button>
+        `}
       </div>
     </div>
   </div>
@@ -2832,7 +2627,6 @@ document.addEventListener('DOMContentLoaded', function(){
   mostrarSplash();
   load();
   goTo('dashboard');
-  mhaRestaurarCarpetaGuardada();
   if(typeof DriveSync !== 'undefined'){
     // init() ahora se encarga solo: reusa token vigente, o renueva en silencio
     // si venció (recién cuando GIS terminó de cargar — antes conectar() corría
@@ -2842,11 +2636,10 @@ document.addEventListener('DOMContentLoaded', function(){
   const navVer = document.getElementById('nav-version');
   if(navVer) navVer.textContent = VERSION;
 
-  // Safe-close: snapshot automático + backup carpeta + Drive
+  // Safe-close: snapshot automático + Drive
   document.addEventListener('visibilitychange', ()=>{
     if(document.visibilityState === 'hidden'){
       mhaHacerSnapshot(false);
-      if(_dirHandle) mhaGuardarEnCarpeta();
       if(typeof DriveSync !== 'undefined' && DriveSync.conectado) mhaSubirDrive(true);
     }
   });
