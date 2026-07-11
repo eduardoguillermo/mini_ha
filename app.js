@@ -2,7 +2,7 @@
 
 // ── CONSTANTES ────────────────────────────────────────────────────────────────
 const SKEY = 'mini-ha';
-const VERSION = 'v1.18';
+const VERSION = 'v1.19';
 
 // ── File System Access API ────────────────────────────────────────────────────
 let _dirHandle = null;
@@ -2386,7 +2386,9 @@ function renderInstFicha(id){
       </td></tr>`).join('');
   const secRed = instSec('red', '🌐 Acceso y red', '', `<div style="${g2}">
     ${instFld('IP local' + (r.ipFija?' (fija)':''), esc(r.ipLocal), true)}
-    ${instFld('MAC', esc(r.mac), true)}
+    ${instFld('MAC Ethernet', esc(r.macEth||r.mac), true)}
+    ${instFld('MAC WiFi', esc(r.macWifi), true)}
+    ${instFld('MAC Bluetooth', esc(r.macBt), true)}
     ${instFld('Router / Gateway', esc([r.router, r.gateway].filter(Boolean).join(' — ')), true)}
     ${instFld('SSID / Clave WiFi', r.ssid || r.wifiPass ? esc(r.ssid||'—') + ' · ' + instPwHTML('red:0:wifiPass', r.wifiPass) : '')}
     ${instFld('Nabu Casa — cuenta', n.activo ? esc(n.cuenta) : '<span class="text3">Sin Nabu Casa</span>')}
@@ -2492,7 +2494,9 @@ function instFormHTML(i){
       <div style="grid-column:1/-1;border-top:1px solid var(--border);margin-top:4px;padding-top:8px;font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em">Red</div>
       <div><label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px">IP local</label><input style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" id="if-ip" value="${esc(r.ipLocal||'')}" placeholder="192.168.1.50"></div>
       <div style="display:flex;align-items:flex-end;padding-bottom:6px"><label style="font-size:12px;display:flex;gap:6px;align-items:center"><input type="checkbox" id="if-ipfija" ${r.ipFija?'checked':''}> IP fija</label></div>
-      <div><label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px">MAC</label><input style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" id="if-mac" value="${esc(r.mac||'')}"></div>
+      <div><label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px">MAC Ethernet</label><input style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" id="if-mac-eth" value="${esc(r.macEth||r.mac||'')}" placeholder="XX:XX:XX:XX:XX:XX"></div>
+      <div><label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px">MAC WiFi</label><input style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" id="if-mac-wifi" value="${esc(r.macWifi||'')}" placeholder="XX:XX:XX:XX:XX:XX"></div>
+      <div><label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px">MAC Bluetooth</label><input style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" id="if-mac-bt" value="${esc(r.macBt||'')}" placeholder="XX:XX:XX:XX:XX:XX"></div>
       <div><label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px">Router</label><input style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" id="if-router" value="${esc(r.router||'')}" placeholder="TP-Link AX55"></div>
       <div><label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px">Gateway</label><input style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" id="if-gw" value="${esc(r.gateway||'')}" placeholder="192.168.1.1"></div>
       <div><label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px">SSID</label><input style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" id="if-ssid" value="${esc(r.ssid||'')}"></div>
@@ -2517,7 +2521,9 @@ function instLeerForm(i){
   i.red = {
     ipLocal: document.getElementById('if-ip').value.trim(),
     ipFija:  document.getElementById('if-ipfija').checked,
-    mac:     document.getElementById('if-mac').value.trim(),
+    macEth:  document.getElementById('if-mac-eth').value.trim(),
+    macWifi: document.getElementById('if-mac-wifi').value.trim(),
+    macBt:   document.getElementById('if-mac-bt').value.trim(),
     router:  document.getElementById('if-router').value.trim(),
     gateway: document.getElementById('if-gw').value.trim(),
     ssid:    document.getElementById('if-ssid').value.trim(),
