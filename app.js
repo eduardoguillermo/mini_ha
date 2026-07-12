@@ -2,7 +2,7 @@
 
 // ── CONSTANTES ────────────────────────────────────────────────────────────────
 const SKEY = 'mini-ha';
-const VERSION = 'v1.28';
+const VERSION = 'v1.29';
 
 const ESTADOS_PROY = ['Planificado','En curso','Pausado','Finalizado','Cancelado'];
 const ESTADO_PILL = {
