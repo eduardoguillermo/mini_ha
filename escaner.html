@@ -59,9 +59,10 @@
 
 <!-- PANTALLA 0: elegir proyecto -->
 <div class="screen on" id="s0">
-  <div class="hint" id="driveStatusProy" style="margin-top:6px">☁️ Conectando...</div>
+  <div class="hint" id="driveStatusProy" style="margin-top:6px">☁️ Sin conectar todavía</div>
+  <button class="ghostbtn" style="margin-bottom:14px" onclick="conectarProyectosManual()">☁️ Conectar Drive de Proyectos</button>
   <div class="fg"><label>Proyecto</label>
-    <select id="sel-proyecto"><option value="">-- cargando proyectos --</option></select>
+    <select id="sel-proyecto"><option value="">-- conectá Drive primero --</option></select>
   </div>
   <button class="bigbtn add" onclick="elegirProyecto()">Continuar</button>
   <a class="salir" href="index.html">🏠 Volver a la app completa</a>
@@ -124,7 +125,7 @@
 <script src="drive-sync-stock.js"></script>
 <script>
 const SKEY = 'mini-ha';
-const APP_VERSION = '1.0.1';
+const APP_VERSION = '1.0.2';
 document.getElementById('verLabel').textContent = 'v' + APP_VERSION;
 if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js'); }
 
@@ -241,8 +242,34 @@ async function cargarProyectos(){
         render();
       }catch(e){ console.error('Error al bajar proyectos', e); }
     });
+    // Solo intento silencioso (requiere token guardado de una conexion previa).
+    // La primera conexion la dispara el boton "Conectar Drive de Proyectos" (conectarProyectosManual).
     DriveSync.conectar();
   }
+}
+
+function conectarProyectosManual(){
+  if(typeof DriveSync==='undefined'){ alert('Módulo Drive no cargado.'); return; }
+  document.getElementById('driveStatusProy').textContent='☁️ Conectando...';
+  DriveSync.init(async function(){
+    document.getElementById('driveStatusProy').textContent='☁️ Proyectos: conectado';
+    try{
+      var remote = await DriveSync.bajarBackup();
+      var dbNow = getDB();
+      mergeProyectosRemoto(dbNow, remote && remote.proyectosHA);
+      saveDB(dbNow);
+      var sel = document.getElementById('sel-proyecto');
+      var proys = (dbNow.proyectosHA||[]).filter(function(p){ return p.estado==='En curso' || p.estado==='Pausado'; })
+        .sort(function(a,b){ return (a.titulo||'').localeCompare(b.titulo||'','es'); });
+      sel.innerHTML = '<option value="">-- seleccionar --</option>' +
+        proys.map(function(p){ return '<option value="'+p.uuid+'">'+p.titulo+' ('+p.estado+')</option>'; }).join('');
+    }catch(e){
+      console.error('Error al bajar proyectos', e);
+      document.getElementById('driveStatusProy').textContent='☁️ Error al sincronizar';
+    }
+  });
+  // requestAccessToken con prompt de consentimiento -- necesita venir de un click directo
+  DriveSync.conectar();
 }
 
 function elegirProyecto(){
