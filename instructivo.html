@@ -231,7 +231,7 @@
 <nav class="sidebar">
   <div class="sidebar-logo">
     <h1>🏠 Mini HA</h1>
-    <p>Manual de usuario · v1.12</p>
+    <p>Manual de usuario · v1.30</p>
   </div>
 
   <div class="section-label">Introducción</div>
@@ -243,6 +243,7 @@
   <a href="#subproyectos">📁 Subproyectos</a>
   <a href="#ficha">📝 Ficha de subproyecto</a>
   <a href="#stock">📦 Stock VSS</a>
+  <a href="#escaner" style="padding-left:28px;font-size:12.5px">📷 Escáner de materiales</a>
   <a href="#reportes">📈 Reportes</a>
   <a href="#config">⚙️ Configuración</a>
   <a href="#instalaciones">🖥️ Instalaciones HA</a>
@@ -266,7 +267,7 @@
     <h1>🏠 Mini HA</h1>
     <p>Gestión de proyectos de Home Assistant y automatización — de la idea al cierre</p>
     <div class="hero-badges">
-      <span class="badge badge-green">✓ v1.12</span>
+      <span class="badge badge-green">✓ v1.30</span>
       <span class="badge badge-blue">✓ Sin servidor</span>
       <span class="badge badge-amber">✓ Datos locales</span>
       <span class="badge badge-purple">☁️ Sync opcional a Drive</span>
@@ -406,6 +407,40 @@
     </div>
     <p>La tabla de detalle se puede ordenar por cualquier columna (código, componente, unidad, stock, costo, valor) y filtrar con el buscador.</p>
     <div class="note">📌 El catálogo se importa desde <a href="#backup">💾 Backup</a> — hay que exportar primero el backup JSON desde VSS Logística.</div>
+  </section>
+
+  <!-- ESCANER DE MATERIALES -->
+  <section class="section" id="escaner">
+    <div class="section-header">
+      <span class="section-icon">📷</span>
+      <div>
+        <div class="section-title">Escáner de materiales</div>
+        <div class="section-subtitle">Registrar consumo de un subproyecto escaneando el código de barras</div>
+      </div>
+    </div>
+    <p>Página aparte, pensada para el celular, para descontar materiales del stock de VSS Logística y anotarlos como usados en un subproyecto sin pasar por el menú completo.</p>
+    <div class="note">📌 URL directa: <code>https://eduardoguillermo.github.io/mini_ha/escaner.html</code>. Se puede instalar como ícono aparte en la pantalla de inicio (tiene su propio <code>manifest-escaner.json</code>).</div>
+
+    <h2>Cómo funciona</h2>
+    <div class="steps">
+      <div class="step"><div class="step-num">1</div><div class="step-body">Elegir el subproyecto (solo aparecen los que están "En curso" o "Pausado").</div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-body">Escanear el código del material.</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-body">Si está en el stock de Logística: se muestra el nombre y stock actual, se pone la cantidad usada y se confirma. Si no está: se carga como "material libre" (solo nombre y cantidad, sin descontar stock).</div></div>
+    </div>
+    <p>Al confirmar pasan dos cosas: se registra una Salida en VSS Logística (con destino = nombre del subproyecto) y se agrega el material a la lista de "Materiales usados" de la ficha del subproyecto.</p>
+
+    <h2>Conexiones a Drive necesarias</h2>
+    <p>El escáner usa <strong>dos</strong> conexiones a Drive independientes, hay que autorizar las dos por separado la primera vez en cada dispositivo:</p>
+    <table>
+      <tr><th>Conexión</th><th>Para qué</th></tr>
+      <tr><td>☁️ Conectar Drive de Proyectos</td><td>Leer y actualizar los subproyectos (carpeta "MiniHA")</td></tr>
+      <tr><td>☁️ Conectar Drive (Stock)</td><td>Leer y descontar el stock de VSS Logística (carpeta "VSSLogisticaStock") — se reusa automáticamente si ese mismo celu ya se conectó antes desde el escáner de Logística</td></tr>
+    </table>
+    <div class="note">📌 La primera conexión a cada carpeta tiene que hacerse tocando el botón correspondiente (no puede ser automática) — así lo exige Google para mostrar el permiso.</div>
+
+    <h2>¿Y en la PC?</h2>
+    <p>Los materiales que se agregan desde el celu llegan solos a la PC: al abrir Mini HA (o cada 45 segundos mientras está abierta) la app fusiona en silencio lo nuevo de Drive, sin tocar "Fusionar" a mano.</p>
+    <div class="tip">💡 Esta sincronización de materiales es independiente de la sincronización general de Drive descripta en <a href="#drive">☁️ Sincronización con Drive</a> — ahí también se puede fusionar manualmente si hace falta.</div>
   </section>
 
   <!-- REPORTES -->
@@ -610,6 +645,15 @@
         <div class="section-title">Historial de cambios</div>
         <div class="section-subtitle">Registro de versiones — de más reciente a más antigua</div>
       </div>
+    </div>
+
+    <div class="changelog-entry">
+      <div class="changelog-version"><span class="v-num">v1.30</span><span class="changelog-tag tag-feature">feature</span></div>
+      <ul class="changelog-list">
+        <li>Nuevo <a href="#escaner">📷 Escáner de materiales</a>: página standalone para celular que descuenta stock de VSS Logística en vivo (vía Drive) y registra el consumo directo en la ficha del subproyecto</li>
+        <li>Fusión automática y silenciosa de subproyectos e instalaciones al abrir la app y cada 45 segundos, sin depender de tocar "Fusionar" a mano</li>
+        <li>Merge de subproyectos más robusto: reconoce coincidencias por <code>id</code> además de <code>uuid</code>, evitando duplicados en subproyectos creados antes de tener identificador único</li>
+      </ul>
     </div>
 
     <div class="changelog-entry">
