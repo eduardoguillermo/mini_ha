@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Mini HA — Escaner de materiales</title>
+<link rel="manifest" href="manifest-escaner.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap">
+<style>
+  :root{
+    --acc:#4f46e5; --acc-dark:#3730a3;
+    --bg:#0f1420; --card:#171e2e; --border:#293349;
+    --ink:#e6e9f2; --sub:#8993ab; --ok:#16a34a; --bad:#dc2626; --dev:#f59e0b; --sig:#93c5fd;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; font-family:'Inter',system-ui,sans-serif; background:var(--bg); color:var(--ink);}
+  .topbar{background:var(--acc); color:#fff; padding:14px 16px; display:flex; justify-content:space-between; align-items:center; position:sticky; top:0; z-index:5;}
+  .topbar .name{font-weight:700; font-size:15px;}
+  .topbar .ver{font-family:monospace; font-size:10px; opacity:.85;}
+  .screen{display:none; flex-direction:column; padding:16px; max-width:480px; margin:0 auto;}
+  .screen.on{display:flex;}
+
+  .proybar{background:var(--card); border:1px solid var(--border); border-radius:12px; padding:10px 14px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center;}
+  .proybar .pnom{font-weight:700; font-size:13px;}
+  .proybar .pcambiar{font-size:11px; color:var(--sub); cursor:pointer; text-decoration:underline;}
+
+  #reader{width:100%; aspect-ratio:1/1; background:#000; border-radius:16px; overflow:hidden; position:relative;}
+  #reader video{width:100%; height:100%; object-fit:cover;}
+  .marco{position:absolute; left:17%; right:17%; top:34%; bottom:34%; border:3px solid var(--dev); border-radius:8px; pointer-events:none;}
+  .hint{text-align:center; color:var(--sub); font-size:12px; font-family:monospace; margin:10px 0 16px;}
+
+  .manual{display:flex; gap:8px; margin-bottom:14px;}
+  .manual input{flex:1; padding:12px; border-radius:10px; border:1.5px solid var(--border); font-size:14px; background:var(--card); color:var(--ink);}
+  .manual button{padding:12px 16px; border-radius:10px; border:none; background:var(--acc); color:#fff; font-weight:600;}
+
+  .prod-hit{background:var(--card); border:1px solid var(--border); border-radius:14px; padding:14px; margin-bottom:14px;}
+  .prod-hit .cod{font-family:monospace; font-size:11px; color:var(--sub);}
+  .prod-hit h3{margin:4px 0 0; font-size:16px; color:var(--ink);}
+  .prod-hit .st{font-size:12px; color:var(--sub); margin-top:3px;}
+
+  .fg{margin-bottom:12px;}
+  .fg label{display:block; font-size:11px; color:var(--sub); font-weight:600; margin-bottom:5px;}
+  .fg input, .fg select{width:100%; padding:12px; border-radius:10px; border:1.5px solid var(--border); font-size:14px; background:var(--card); color:var(--ink);}
+
+  .bigbtn{padding:18px; border-radius:16px; border:none; color:#fff; font-weight:700; font-size:15px; margin-bottom:10px; cursor:pointer; width:100%;}
+  .bigbtn.add{background:var(--acc);}
+  .bigbtn.neu{background:#334155;}
+  .ghostbtn{padding:13px; border-radius:12px; border:1.5px solid var(--border); background:transparent; color:var(--sub); font-weight:600; font-size:13px; cursor:pointer; width:100%;}
+
+  .salir{margin-top:16px; padding:12px; border-radius:12px; border:1.5px solid var(--border); background:transparent; color:var(--sub); font-weight:700; font-size:13px; cursor:pointer; width:100%; text-align:center; text-decoration:none; display:block;}
+  .signature{text-align:center; font-family:'Dancing Script',cursive; color:var(--sig); font-size:14px; padding:16px 0 6px;}
+</style>
+</head>
+<body>
+
+<div class="topbar"><span class="name">🔧 Mini HA — Escaner de materiales</span><span class="ver" id="verLabel">v1.0.0</span></div>
+
+<!-- PANTALLA 0: elegir proyecto -->
+<div class="screen on" id="s0">
+  <div class="hint" id="driveStatusProy" style="margin-top:6px">☁️ Conectando...</div>
+  <div class="fg"><label>Proyecto</label>
+    <select id="sel-proyecto"><option value="">-- cargando proyectos --</option></select>
+  </div>
+  <button class="bigbtn add" onclick="elegirProyecto()">Continuar</button>
+  <a class="salir" href="index.html">🏠 Volver a la app completa</a>
+  <div class="signature">Development by Guille</div>
+</div>
+
+<!-- PANTALLA 1: escaneo -->
+<div class="screen" id="s1">
+  <div class="proybar">
+    <span class="pnom" id="proyActualNombre"></span>
+    <span class="pcambiar" onclick="cambiarProyecto()">Cambiar</span>
+  </div>
+
+  <div id="reader"><div class="marco"></div></div>
+  <div class="hint" id="camHint">Apuntá al código de barras del material</div>
+
+  <div class="manual">
+    <input id="manualEan" type="text" inputmode="numeric" placeholder="O ingresá el código manualmente">
+    <button onclick="procesarCodigo(document.getElementById('manualEan').value.trim())">Ir</button>
+  </div>
+  <div class="hint" id="driveStatusStock">☁️ Stock: conectando...</div>
+</div>
+
+<!-- PANTALLA 2: material encontrado en stock -->
+<div class="screen" id="s2">
+  <div class="prod-hit">
+    <div class="cod" id="s2cod"></div>
+    <h3 id="s2nombre"></h3>
+    <div class="st" id="s2stock"></div>
+  </div>
+  <div class="fg"><label>Cantidad usada</label><input id="f-cant" type="number" min="1" value="1" inputmode="numeric"></div>
+  <button class="bigbtn add" onclick="confirmarUso()">✅ Registrar uso en el proyecto</button>
+  <button class="ghostbtn" onclick="volverAEscanear()">Cancelar</button>
+</div>
+
+<!-- PANTALLA 2b: EAN no encontrado en stock de Logistica -->
+<div class="screen" id="s2b">
+  <div class="prod-hit">
+    <div class="cod" id="s2bean"></div>
+    <div class="st">No está en el stock de VSS Logística</div>
+  </div>
+  <div class="fg"><label>Nombre del material</label><input id="f-libre-nombre" placeholder="Ej: Tornillo autoperforante"></div>
+  <div class="fg"><label>Cantidad usada</label><input id="f-libre-cant" type="number" min="1" value="1" inputmode="numeric"></div>
+  <button class="bigbtn neu" onclick="confirmarUsoLibre()">Registrar como material libre</button>
+  <div class="hint" style="margin-top:4px">Se agrega al proyecto sin descontar stock de Logística.</div>
+  <button class="ghostbtn" onclick="volverAEscanear()">Cancelar</button>
+</div>
+
+<!-- PANTALLA 3: confirmación -->
+<div class="screen" id="s3">
+  <div class="prod-hit" style="border-color:var(--ok); border-width:1.5px;">
+    <div class="cod">✓ Registrado</div>
+    <h3 id="s3resumen"></h3>
+  </div>
+  <button class="bigbtn add" onclick="volverAEscanear()">Escanear otro</button>
+</div>
+
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="drive-sync.js"></script>
+<script src="drive-sync-stock.js"></script>
+<script>
+const SKEY = 'mini-ha';
+const APP_VERSION = '1.0.0';
+document.getElementById('verLabel').textContent = 'v' + APP_VERSION;
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js'); }
+
+function getDB(){
+  try{ var d = JSON.parse(localStorage.getItem(SKEY)); return d || {}; }catch(e){ return {}; }
+}
+function saveDB(db){ localStorage.setItem(SKEY, JSON.stringify(db)); }
+function genId(){ return 'x'+Date.now().toString(36)+Math.random().toString(36).slice(2,8); }
+function nuevoUUID(){
+  if(crypto.randomUUID) return crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c){
+    var r = Math.random()*16|0, v = c==='x'?r:(r&0x3|0x8);
+    return v.toString(16);
+  });
+}
+function today(){
+  var d=new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+
+// ---- Stock de Logistica (EAN -> componente) ----
+function stockDe(db, cid){
+  var st=0;
+  (db.movimientos||[]).forEach(function(m){
+    var mcid=m.cid||m.compId;
+    if(mcid===cid) st += m.tipo==='Entrada' ? (parseFloat(m.cant)||0) : -(parseFloat(m.cant)||0);
+  });
+  return st;
+}
+function mergeStockRemoto(db, remote){
+  if(!remote) return;
+  db.componentes = db.componentes || [];
+  db.movimientos = db.movimientos || [];
+  db.config = db.config || {};
+  var byId={}; db.componentes.forEach(function(c){byId[c.id]=c;});
+  (remote.componentes||[]).forEach(function(rc){
+    var local=byId[rc.id];
+    if(!local){ db.componentes.push(rc); byId[rc.id]=rc; }
+    else if((rc.lastModified||0) > (local.lastModified||0)){ Object.assign(local, rc); }
+  });
+  var movIds={}; db.movimientos.forEach(function(m){movIds[m.id]=true;});
+  (remote.movimientos||[]).forEach(function(rm){
+    if(!movIds[rm.id]){ db.movimientos.push(rm); movIds[rm.id]=true; }
+  });
+}
+function stockBackupPayload(db){
+  return {
+    componentes: db.componentes||[],
+    movimientos: db.movimientos||[],
+    config: {
+      destinosSalida: (db.config&&db.config.destinosSalida)||[],
+      origenesEntrada: (db.config&&db.config.origenesEntrada)||[],
+      motivosSalida: (db.config&&db.config.motivosSalida)||[]
+    },
+    updatedAt: Date.now()
+  };
+}
+
+// Cache local liviano del stock de Logistica, separado del DB de Mini HA
+var _stockLocal = { componentes: [], movimientos: [] };
+function stockGetLocal(){
+  try{ return JSON.parse(localStorage.getItem('vsslog_stock_cache'))||{componentes:[],movimientos:[]}; }catch(e){ return {componentes:[],movimientos:[]}; }
+}
+function stockSetLocal(db){ localStorage.setItem('vsslog_stock_cache', JSON.stringify(db)); }
+
+// ---- Proyectos de Mini HA ----
+function mergeProyectosRemoto(db, remoteProyectos){
+  db.proyectosHA = db.proyectosHA || [];
+  var mapa = {};
+  db.proyectosHA.forEach(function(p){
+    if(!p.uuid) p.uuid = nuevoUUID();
+    if(!p.lastModified) p.lastModified = 0;
+    mapa[p.uuid] = p;
+  });
+  (remoteProyectos||[]).forEach(function(rp){
+    if(!rp.uuid) return;
+    var local = mapa[rp.uuid];
+    if(!local){ mapa[rp.uuid] = rp; }
+    else if((rp.lastModified||0) > (local.lastModified||0)){ mapa[rp.uuid] = rp; }
+  });
+  db.proyectosHA = Object.keys(mapa).map(function(k){ return mapa[k]; });
+}
+
+let eanActual = null;
+let proyectoActual = null; // objeto proyecto (referencia dentro de db.proyectosHA local)
+let barcodeDetector = null;
+let scanLoopActive = false;
+
+function mostrar(id){
+  document.querySelectorAll('.screen').forEach(function(s){ s.classList.remove('on'); });
+  document.getElementById(id).classList.add('on');
+}
+
+// ---- Paso 0: elegir proyecto ----
+async function cargarProyectos(){
+  var db = getDB();
+  var sel = document.getElementById('sel-proyecto');
+  var render = function(){
+    var proys = (db.proyectosHA||[]).filter(function(p){ return p.estado==='En curso' || p.estado==='Pausado'; })
+      .sort(function(a,b){ return (a.nombre||'').localeCompare(b.nombre||'','es'); });
+    sel.innerHTML = '<option value="">-- seleccionar --</option>' +
+      proys.map(function(p){ return '<option value="'+p.uuid+'">'+p.nombre+' ('+p.estado+')</option>'; }).join('');
+  };
+  render();
+  if(typeof DriveSync!=='undefined'){
+    DriveSync.init(async function(){
+      document.getElementById('driveStatusProy').textContent='☁️ Proyectos: conectado';
+      try{
+        var remote = await DriveSync.bajarBackup();
+        var dbNow = getDB();
+        mergeProyectosRemoto(dbNow, remote && remote.proyectosHA);
+        saveDB(dbNow);
+        db = dbNow;
+        render();
+      }catch(e){ console.error('Error al bajar proyectos', e); }
+    });
+    DriveSync.conectar();
+  }
+}
+
+function elegirProyecto(){
+  var uuid = document.getElementById('sel-proyecto').value;
+  if(!uuid){ alert('Seleccioná un proyecto.'); return; }
+  var db = getDB();
+  proyectoActual = (db.proyectosHA||[]).find(function(p){ return p.uuid===uuid; });
+  if(!proyectoActual){ alert('No se encontró el proyecto, probá reconectar.'); return; }
+  document.getElementById('proyActualNombre').textContent = '📁 ' + proyectoActual.nombre;
+  mostrar('s1');
+  iniciarCamara();
+  conectarStock();
+}
+
+function cambiarProyecto(){
+  detenerCamara();
+  eanActual = null;
+  proyectoActual = null;
+  mostrar('s0');
+}
+
+function volverAEscanear(){
+  eanActual = null;
+  document.getElementById('manualEan').value = '';
+  mostrar('s1');
+  iniciarCamara();
+}
+
+// ---- Conexion al stock de Logistica ----
+async function conectarStock(){
+  if(typeof DriveSyncStock==='undefined') return;
+  DriveSyncStock.init(async function(){
+    document.getElementById('driveStatusStock').textContent='☁️ Stock: conectado';
+    await refrescarStock();
+  });
+  DriveSyncStock.conectar();
+}
+async function refrescarStock(){
+  if(typeof DriveSyncStock==='undefined' || !DriveSyncStock.conectado) return;
+  try{
+    var remote = await DriveSyncStock.bajarBackup();
+    var local = stockGetLocal();
+    mergeStockRemoto(local, remote);
+    stockSetLocal(local);
+    _stockLocal = local;
+  }catch(e){ console.error('Error al refrescar stock', e); }
+}
+
+// ---- Escaneo ----
+function procesarCodigo(ean){
+  if(!ean) return;
+  detenerCamara();
+  eanActual = ean;
+  var db = stockGetLocal();
+  var comp = (db.componentes||[]).find(function(c){ return c.ean===ean; });
+  if(comp){
+    document.getElementById('s2cod').textContent = comp.codigo || ean;
+    document.getElementById('s2nombre').textContent = comp.desc;
+    document.getElementById('s2stock').textContent = 'Stock actual: ' + stockDe(db, comp.id) + ' ' + (comp.unidad||'u');
+    mostrar('s2');
+  } else {
+    document.getElementById('s2bean').textContent = ean;
+    mostrar('s2b');
+  }
+}
+
+async function confirmarUso(){
+  var cant = parseFloat(document.getElementById('f-cant').value) || 0;
+  if(cant<=0){ alert('Ingresá una cantidad válida.'); return; }
+  var stockDb = stockGetLocal();
+  var comp = (stockDb.componentes||[]).find(function(c){ return c.ean===eanActual; });
+  if(!comp) return;
+
+  // 1) Descontar del stock de Logistica (Salida)
+  if(typeof DriveSyncStock!=='undefined' && DriveSyncStock.conectado){
+    try{
+      var remoteStock = await DriveSyncStock.bajarBackup();
+      var db2 = stockGetLocal();
+      mergeStockRemoto(db2, remoteStock);
+      db2.movimientos = db2.movimientos || [];
+      db2.movimientos.push({ id:genId(), cid:comp.id, tipo:'Salida manual', cant:cant, fecha:today(), nota:'Escaneo desde Mini HA', destino:(proyectoActual?proyectoActual.nombre:'Mini HA'), estadoMat:'N' });
+      stockSetLocal(db2);
+      await DriveSyncStock.subirBackup(stockBackupPayload(db2));
+    }catch(e){
+      console.error('Error al descontar stock', e);
+      alert('No se pudo descontar del stock de Logística (sin conexión). El uso en el proyecto igual se va a registrar.');
+    }
+  } else {
+    alert('Drive de Stock no conectado — no se pudo descontar. El uso en el proyecto igual se va a registrar.');
+  }
+
+  // 2) Registrar uso en el proyecto de Mini HA
+  await registrarMaterialEnProyecto({ compId: comp.id, cant: cant, notas: 'Escaneo EAN' });
+
+  document.getElementById('s3resumen').textContent = '📦 ' + cant + ' ' + (comp.unidad||'u') + ' · ' + comp.desc + ' → ' + (proyectoActual?proyectoActual.nombre:'');
+  mostrar('s3');
+}
+
+async function confirmarUsoLibre(){
+  var nombre = (document.getElementById('f-libre-nombre').value||'').trim();
+  var cant = parseFloat(document.getElementById('f-libre-cant').value) || 0;
+  if(!nombre){ alert('Ingresá el nombre del material.'); return; }
+  if(cant<=0){ alert('Ingresá una cantidad válida.'); return; }
+  await registrarMaterialEnProyecto({ nombreLibre: nombre, cant: cant, notas: 'Escaneo EAN (sin stock Logística)' });
+  document.getElementById('s3resumen').textContent = '📦 ' + cant + ' · ' + nombre + ' → ' + (proyectoActual?proyectoActual.nombre:'');
+  mostrar('s3');
+}
+
+async function registrarMaterialEnProyecto(mat){
+  var db = getDB();
+  if(typeof DriveSync!=='undefined' && DriveSync.conectado){
+    try{
+      var remote = await DriveSync.bajarBackup();
+      mergeProyectosRemoto(db, remote && remote.proyectosHA);
+    }catch(e){ console.error('Error al refrescar proyectos antes de guardar', e); }
+  }
+  var p = (db.proyectosHA||[]).find(function(x){ return x.uuid===proyectoActual.uuid; });
+  if(!p){ alert('El proyecto ya no está disponible, volvé a elegirlo.'); cambiarProyecto(); return; }
+  p.materiales = p.materiales || [];
+  p.materiales.push(mat);
+  p.lastModified = Date.now();
+  proyectoActual = p;
+  saveDB(db);
+  if(typeof DriveSync!=='undefined' && DriveSync.conectado){
+    try{ await DriveSync.subirBackup(db); }catch(e){ console.error('Error al subir proyecto actualizado', e); }
+  }
+}
+
+// ---- Cámara: BarcodeDetector nativo (Chrome/Android). Fallback: input manual. ----
+async function iniciarCamara(){
+  const hint = document.getElementById('camHint');
+  if(!('BarcodeDetector' in window)){
+    hint.textContent = 'Tu navegador no soporta lectura automática — usá el código manual abajo';
+    return;
+  }
+  try{
+    barcodeDetector = new BarcodeDetector({ formats: ['ean_13','ean_8','upc_a','upc_e','code_128'] });
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    const reader = document.getElementById('reader');
+    let video = reader.querySelector('video');
+    if(!video){ video = document.createElement('video'); video.autoplay = true; video.muted = true; video.playsInline = true; reader.prepend(video); }
+    video.srcObject = stream;
+    scanLoopActive = true;
+    loopEscaneo(video);
+  }catch(e){
+    console.error('Camara error', e);
+    hint.textContent = 'No se pudo abrir la cámara — usá el código manual abajo';
+  }
+}
+async function loopEscaneo(video){
+  if(!scanLoopActive) return;
+  try{
+    const codes = await barcodeDetector.detect(video);
+    if(codes.length){ procesarCodigo(codes[0].rawValue); return; }
+  }catch(e){ /* frame sin lectura, seguir intentando */ }
+  requestAnimationFrame(() => loopEscaneo(video));
+}
+function detenerCamara(){
+  scanLoopActive = false;
+  const video = document.querySelector('#reader video');
+  if(video && video.srcObject){ video.srcObject.getTracks().forEach(function(t){t.stop();}); }
+}
+
+cargarProyectos();
+</script>
+</body>
+</html>
