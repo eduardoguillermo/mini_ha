@@ -124,7 +124,7 @@
 <script src="drive-sync-stock.js"></script>
 <script>
 const SKEY = 'mini-ha';
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.0.1';
 document.getElementById('verLabel').textContent = 'v' + APP_VERSION;
 if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js'); }
 
@@ -224,9 +224,9 @@ async function cargarProyectos(){
   var sel = document.getElementById('sel-proyecto');
   var render = function(){
     var proys = (db.proyectosHA||[]).filter(function(p){ return p.estado==='En curso' || p.estado==='Pausado'; })
-      .sort(function(a,b){ return (a.nombre||'').localeCompare(b.nombre||'','es'); });
+      .sort(function(a,b){ return (a.titulo||'').localeCompare(b.titulo||'','es'); });
     sel.innerHTML = '<option value="">-- seleccionar --</option>' +
-      proys.map(function(p){ return '<option value="'+p.uuid+'">'+p.nombre+' ('+p.estado+')</option>'; }).join('');
+      proys.map(function(p){ return '<option value="'+p.uuid+'">'+p.titulo+' ('+p.estado+')</option>'; }).join('');
   };
   render();
   if(typeof DriveSync!=='undefined'){
@@ -251,7 +251,7 @@ function elegirProyecto(){
   var db = getDB();
   proyectoActual = (db.proyectosHA||[]).find(function(p){ return p.uuid===uuid; });
   if(!proyectoActual){ alert('No se encontró el proyecto, probá reconectar.'); return; }
-  document.getElementById('proyActualNombre').textContent = '📁 ' + proyectoActual.nombre;
+  document.getElementById('proyActualNombre').textContent = '📁 ' + proyectoActual.titulo;
   mostrar('s1');
   iniciarCamara();
   conectarStock();
@@ -323,7 +323,7 @@ async function confirmarUso(){
       var db2 = stockGetLocal();
       mergeStockRemoto(db2, remoteStock);
       db2.movimientos = db2.movimientos || [];
-      db2.movimientos.push({ id:genId(), cid:comp.id, tipo:'Salida manual', cant:cant, fecha:today(), nota:'Escaneo desde Mini HA', destino:(proyectoActual?proyectoActual.nombre:'Mini HA'), estadoMat:'N' });
+      db2.movimientos.push({ id:genId(), cid:comp.id, tipo:'Salida manual', cant:cant, fecha:today(), nota:'Escaneo desde Mini HA', destino:(proyectoActual?proyectoActual.titulo:'Mini HA'), estadoMat:'N' });
       stockSetLocal(db2);
       await DriveSyncStock.subirBackup(stockBackupPayload(db2));
     }catch(e){
@@ -337,7 +337,7 @@ async function confirmarUso(){
   // 2) Registrar uso en el proyecto de Mini HA
   await registrarMaterialEnProyecto({ compId: comp.id, cant: cant, notas: 'Escaneo EAN' });
 
-  document.getElementById('s3resumen').textContent = '📦 ' + cant + ' ' + (comp.unidad||'u') + ' · ' + comp.desc + ' → ' + (proyectoActual?proyectoActual.nombre:'');
+  document.getElementById('s3resumen').textContent = '📦 ' + cant + ' ' + (comp.unidad||'u') + ' · ' + comp.desc + ' → ' + (proyectoActual?proyectoActual.titulo:'');
   mostrar('s3');
 }
 
@@ -347,7 +347,7 @@ async function confirmarUsoLibre(){
   if(!nombre){ alert('Ingresá el nombre del material.'); return; }
   if(cant<=0){ alert('Ingresá una cantidad válida.'); return; }
   await registrarMaterialEnProyecto({ nombreLibre: nombre, cant: cant, notas: 'Escaneo EAN (sin stock Logística)' });
-  document.getElementById('s3resumen').textContent = '📦 ' + cant + ' · ' + nombre + ' → ' + (proyectoActual?proyectoActual.nombre:'');
+  document.getElementById('s3resumen').textContent = '📦 ' + cant + ' · ' + nombre + ' → ' + (proyectoActual?proyectoActual.titulo:'');
   mostrar('s3');
 }
 
