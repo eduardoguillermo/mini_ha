@@ -125,7 +125,7 @@
 <script src="drive-sync-stock.js"></script>
 <script>
 const SKEY = 'mini-ha';
-const APP_VERSION = '1.0.2';
+const APP_VERSION = '1.0.3';
 document.getElementById('verLabel').textContent = 'v' + APP_VERSION;
 if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js'); }
 
@@ -194,19 +194,37 @@ function stockSetLocal(db){ localStorage.setItem('vsslog_stock_cache', JSON.stri
 // ---- Proyectos de Mini HA ----
 function mergeProyectosRemoto(db, remoteProyectos){
   db.proyectosHA = db.proyectosHA || [];
-  var mapa = {};
+  db.proyectosHA.forEach(function(p){ if(!p.lastModified) p.lastModified = 0; });
+  var porUuid = {}, porId = {};
   db.proyectosHA.forEach(function(p){
-    if(!p.uuid) p.uuid = nuevoUUID();
-    if(!p.lastModified) p.lastModified = 0;
-    mapa[p.uuid] = p;
+    if(p.uuid) porUuid[p.uuid] = p;
+    if(p.id!=null) porId[p.id] = p;
   });
   (remoteProyectos||[]).forEach(function(rp){
-    if(!rp.uuid) return;
-    var local = mapa[rp.uuid];
-    if(!local){ mapa[rp.uuid] = rp; }
-    else if((rp.lastModified||0) > (local.lastModified||0)){ mapa[rp.uuid] = rp; }
+    var local = (rp.uuid && porUuid[rp.uuid]) || (rp.id!=null && porId[rp.id]);
+    if(!local){
+      if(!rp.uuid) rp.uuid = nuevoUUID();
+      db.proyectosHA.push(rp);
+      if(rp.uuid) porUuid[rp.uuid] = rp;
+      if(rp.id!=null) porId[rp.id] = rp;
+    } else {
+      if(!local.uuid && rp.uuid) local.uuid = rp.uuid;
+      if((rp.lastModified||0) > (local.lastModified||0)){
+        var uuidLocal = local.uuid;
+        Object.assign(local, rp);
+        local.uuid = uuidLocal || rp.uuid;
+      }
+    }
   });
-  db.proyectosHA = Object.keys(mapa).map(function(k){ return mapa[k]; });
+  // Deduplicar por si quedaron dos entradas para el mismo id (arrastradas de antes de este fix)
+  var vistos = {}; var limpio = [];
+  db.proyectosHA.forEach(function(p){
+    var clave = p.uuid || ('id:'+p.id);
+    if(vistos[clave]) return;
+    vistos[clave] = true;
+    limpio.push(p);
+  });
+  db.proyectosHA = limpio;
 }
 
 let eanActual = null;
