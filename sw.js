@@ -1,9 +1,12 @@
-const CACHE = 'mini-ha-v1.28';
+const CACHE = 'mini-ha-v1.29';
 const ASSETS = [
   '/mini_ha/',
   '/mini_ha/index.html',
   '/mini_ha/app.js',
   '/mini_ha/drive-sync.js',
+  '/mini_ha/drive-sync-stock.js',
+  '/mini_ha/escaner.html',
+  '/mini_ha/manifest-escaner.json',
   '/mini_ha/style.css',
   '/mini_ha/manifest.json'
 ];
