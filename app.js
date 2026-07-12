@@ -2,7 +2,7 @@
 
 // ── CONSTANTES ────────────────────────────────────────────────────────────────
 const SKEY = 'mini-ha';
-const VERSION = 'v1.29';
+const VERSION = 'v1.30';
 
 const ESTADOS_PROY = ['Planificado','En curso','Pausado','Finalizado','Cancelado'];
 const ESTADO_PILL = {
@@ -2627,6 +2627,22 @@ function instNotaAgregar(){
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
+async function mhaAutoFusionar(){
+  if(typeof DriveSync === 'undefined' || !DriveSync.conectado) return;
+  try{
+    const remoto = await DriveSync.bajarBackup();
+    if(!remoto || !remoto.proyectosHA) return;
+    const rp = mhaMergeProyectos(remoto.proyectosHA);
+    const ri = mhaMergeInstalaciones(remoto.instalaciones);
+    if(rp.agregados || rp.actualizados || ri.agregados || ri.actualizados){
+      save();
+      if(['dashboard','proyectos','proy-ficha','instalaciones','inst-ficha'].includes(_panel)){
+        goTo(_panel);
+      }
+    }
+  }catch(e){ console.error('Auto-fusión Drive:', e); }
+}
+
 document.addEventListener('DOMContentLoaded', function(){
   if (navigator.storage && navigator.storage.persist) {
     navigator.storage.persist().catch(()=>{});
@@ -2638,7 +2654,11 @@ document.addEventListener('DOMContentLoaded', function(){
     // init() ahora se encarga solo: reusa token vigente, o renueva en silencio
     // si venció (recién cuando GIS terminó de cargar — antes conectar() corría
     // demasiado temprano y la renovación nunca ocurría).
-    DriveSync.init(()=>mhaActualizarEstadoDrive());
+    DriveSync.init(()=>{
+      mhaActualizarEstadoDrive();
+      mhaAutoFusionar();
+    });
+    setInterval(()=>{ if(DriveSync.conectado) mhaAutoFusionar(); }, 45000);
   }
   const navVer = document.getElementById('nav-version');
   if(navVer) navVer.textContent = VERSION;
