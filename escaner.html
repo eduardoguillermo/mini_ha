@@ -125,7 +125,7 @@
 <script src="drive-sync-stock.js"></script>
 <script>
 const SKEY = 'mini-ha';
-const APP_VERSION = '1.0.3';
+const APP_VERSION = '1.0.4';
 document.getElementById('verLabel').textContent = 'v' + APP_VERSION;
 if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js'); }
 
@@ -397,22 +397,26 @@ async function confirmarUsoLibre(){
 }
 
 async function registrarMaterialEnProyecto(mat){
-  var db = getDB();
+  var localDb = getDB();
+  var baseDb = localDb;
   if(typeof DriveSync!=='undefined' && DriveSync.conectado){
     try{
       var remote = await DriveSync.bajarBackup();
-      mergeProyectosRemoto(db, remote && remote.proyectosHA);
-    }catch(e){ console.error('Error al refrescar proyectos antes de guardar', e); }
+      if(remote && typeof remote==='object' && Object.keys(remote).length){
+        baseDb = remote; // partimos del backup completo de Drive, no de la copia parcial del celu
+        mergeProyectosRemoto(baseDb, localDb.proyectosHA); // por si el celu tiene algo local que Drive no tiene
+      }
+    }catch(e){ console.error('Error al refrescar antes de guardar', e); }
   }
-  var p = (db.proyectosHA||[]).find(function(x){ return x.uuid===proyectoActual.uuid; });
+  var p = (baseDb.proyectosHA||[]).find(function(x){ return x.uuid===proyectoActual.uuid; });
   if(!p){ alert('El proyecto ya no está disponible, volvé a elegirlo.'); cambiarProyecto(); return; }
   p.materiales = p.materiales || [];
   p.materiales.push(mat);
   p.lastModified = Date.now();
   proyectoActual = p;
-  saveDB(db);
+  saveDB(baseDb);
   if(typeof DriveSync!=='undefined' && DriveSync.conectado){
-    try{ await DriveSync.subirBackup(db); }catch(e){ console.error('Error al subir proyecto actualizado', e); }
+    try{ await DriveSync.subirBackup(baseDb); }catch(e){ console.error('Error al subir proyecto actualizado', e); }
   }
 }
 
