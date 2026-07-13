@@ -83,7 +83,8 @@
     <input id="manualEan" type="text" inputmode="numeric" placeholder="O ingresá el código manualmente">
     <button onclick="procesarCodigo(document.getElementById('manualEan').value.trim())">Ir</button>
   </div>
-  <div class="hint" id="driveStatusStock">☁️ Stock: conectando...</div>
+  <div class="hint" id="driveStatusStock">☁️ Stock: sin conectar</div>
+  <button class="ghostbtn" onclick="conectarStock()">☁️ Conectar Drive (Stock)</button>
 </div>
 
 <!-- PANTALLA 2: material encontrado en stock -->
@@ -125,7 +126,7 @@
 <script src="drive-sync-stock.js"></script>
 <script>
 const SKEY = 'mini-ha';
-const APP_VERSION = '1.0.4';
+const APP_VERSION = '1.0.5';
 document.getElementById('verLabel').textContent = 'v' + APP_VERSION;
 if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js'); }
 
@@ -299,7 +300,15 @@ function elegirProyecto(){
   document.getElementById('proyActualNombre').textContent = '📁 ' + proyectoActual.titulo;
   mostrar('s1');
   iniciarCamara();
-  conectarStock();
+  // Solo intento de reconexion silenciosa (token ya guardado de una conexion previa).
+  // La primera conexion a Stock la hace el boton "Conectar Drive (Stock)" -- así no compite
+  // con el permiso de la cámara por la misma interacción del usuario.
+  if(typeof DriveSyncStock!=='undefined'){
+    DriveSyncStock.init(async function(){
+      document.getElementById('driveStatusStock').textContent='☁️ Stock: conectado';
+      await refrescarStock();
+    });
+  }
 }
 
 function cambiarProyecto(){
@@ -316,9 +325,10 @@ function volverAEscanear(){
   iniciarCamara();
 }
 
-// ---- Conexion al stock de Logistica ----
+// ---- Conexion al stock de Logistica (boton explicito, primera vez) ----
 async function conectarStock(){
   if(typeof DriveSyncStock==='undefined') return;
+  document.getElementById('driveStatusStock').textContent='☁️ Conectando...';
   DriveSyncStock.init(async function(){
     document.getElementById('driveStatusStock').textContent='☁️ Stock: conectado';
     await refrescarStock();
