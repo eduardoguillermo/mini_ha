@@ -2,7 +2,7 @@
 
 // ── CONSTANTES ────────────────────────────────────────────────────────────────
 const SKEY = 'mini-ha';
-const VERSION = 'v1.30';
+const VERSION = 'v1.31';
 
 const ESTADOS_PROY = ['Planificado','En curso','Pausado','Finalizado','Cancelado'];
 const ESTADO_PILL = {
@@ -1287,8 +1287,9 @@ function renderMateriales(p){
       const costoUnit = m.costoManual != null ? m.costoManual : (comp ? comp.costo||0 : null);
       const subtotal  = costoMaterial(m);
       const esManual  = m.costoManual != null;
+      const vinculo   = m.logisticaMovId ? `<span title="Vinculado a un movimiento de Salida en VSS Logística" style="font-size:9px;color:var(--primary);margin-left:4px">🔗 Logística</span>` : '';
       return `<tr>
-        <td style="font-size:12px">${esc(nombre)}${esManual?'<span class="text3" style="font-size:9px;margin-left:4px">manual</span>':''}</td>
+        <td style="font-size:12px">${esc(nombre)}${esManual?'<span class="text3" style="font-size:9px;margin-left:4px">manual</span>':''}${vinculo}</td>
         <td style="font-size:12px">${m.cant} ${comp?esc(comp.unidad||''):''}</td>
         <td style="font-size:12px;color:var(--text2)">${costoUnit != null ? fmtPesos(costoUnit) : '<span class="text3">--</span>'}</td>
         <td style="font-size:12px;font-weight:600">${subtotal ? fmtPesos(subtotal) : '<span class="text3">--</span>'}</td>
@@ -1413,16 +1414,60 @@ function guardarMaterial(proyId){
   if(cont) cont.innerHTML = renderMateriales(p);
 }
 
-function eliminarMaterial(proyId, idx){
+async function eliminarMaterial(proyId, idx){
   const p = DB.proyectosHA.find(x => x.id === proyId);
   if(!p || !p.materiales) return;
-  if(!confirm('¿Eliminar este material?')) return;
-  const matDesc = p.materiales[idx].nombreLibre || (DB.catalogoVSS.find(c=>c.id===p.materiales[idx].compId)||{}).nombre || 'material';
+  const mat = p.materiales[idx];
+  const matDesc = mat.nombreLibre || (DB.catalogoVSS.find(c=>c.id===mat.compId)||{}).nombre || 'material';
+
+  let msg = `¿Eliminar "${matDesc}" del proyecto?`;
+  if(mat.logisticaMovId) msg += '\n\nTambién se va a revertir (borrar) el movimiento de Salida correspondiente en el stock de VSS Logística, restaurando esa cantidad.';
+  if(!confirm(msg)) return;
+
+  if(mat.logisticaMovId){
+    const ok = await revertirMovimientoLogistica(mat.logisticaMovId, matDesc);
+    if(!ok){
+      if(!confirm('No se pudo revertir el movimiento en Logística (revisá la conexión a Drive Stock en Configuración). ¿Eliminar igual el material del proyecto, dejando el descuento de stock como está?')) return;
+    }
+  }
+
   p.materiales.splice(idx, 1);
   agregarHistorial(p, `Material eliminado: "${matDesc}"`);
   save();
   const cont = document.getElementById('ficha-mats');
   if(cont) cont.innerHTML = renderMateriales(p);
+}
+
+// ── Conexion al stock de Logistica (para revertir movimientos desde "Eliminar material") ──
+function mhaConectarDriveStock(){
+  if(typeof DriveSyncStock==='undefined'){ alert('Módulo Drive Stock no cargado.'); return; }
+  DriveSyncStock.init(()=>mhaActualizarEstadoDriveStock());
+  DriveSyncStock.conectar();
+}
+function mhaActualizarEstadoDriveStock(){
+  const el = document.getElementById('drive-stock-status');
+  if(el) el.textContent = (typeof DriveSyncStock!=='undefined' && DriveSyncStock.conectado) ? '☁️ Stock Logística: conectado' : '☁️ Stock Logística: sin conectar';
+}
+async function revertirMovimientoLogistica(movId, descripcion){
+  if(typeof DriveSyncStock==='undefined' || !DriveSyncStock.conectado){
+    alert('Drive de Stock (Logística) no está conectado. Conectalo desde Configuración → Sincronización con VSS Logística.');
+    return false;
+  }
+  try{
+    const remote = await DriveSyncStock.bajarBackup();
+    remote.movimientos = remote.movimientos || [];
+    const antes = remote.movimientos.length;
+    remote.movimientos = remote.movimientos.filter(m => String(m.id) !== String(movId));
+    if(remote.movimientos.length === antes){
+      // Ya no estaba (por ej. lo borraron a mano en Logística) -- no es un error
+      return true;
+    }
+    await DriveSyncStock.subirBackup(remote);
+    return true;
+  }catch(e){
+    console.error('Error al revertir movimiento en Logística:', e);
+    return false;
+  }
 }
 
 function exportarSalidasVSS(proyId){
@@ -1871,6 +1916,14 @@ function renderBackup(){
           <button class="btn" onclick="mhaDriveConectar()" style="background:#4f46e5;color:white;border-color:#4f46e5">☁️ Conectar Drive</button>
         `}
       </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ch"><span class="ct">Sincronización con VSS Logística (Stock)</span></div>
+    <div class="card-body">
+      <p class="text2" style="font-size:12px;margin-bottom:8px">Necesaria para que el <strong>Escáner de materiales</strong> pueda descontar stock, y para revertirlo al eliminar un material vinculado en la ficha de un proyecto.</p>
+      <p id="drive-stock-status" style="font-size:11px;margin-bottom:12px;color:var(--text3)">${(typeof DriveSyncStock !== 'undefined' && DriveSyncStock.conectado) ? '☁️ Stock Logística: conectado' : '☁️ Stock Logística: sin conectar'}</p>
+      <button class="btn" onclick="mhaConectarDriveStock()" style="background:#4f46e5;color:white;border-color:#4f46e5">☁️ Conectar Drive (Stock Logística)</button>
     </div>
   </div>
   <div class="card">
@@ -2659,6 +2712,9 @@ document.addEventListener('DOMContentLoaded', function(){
       mhaAutoFusionar();
     });
     setInterval(()=>{ if(DriveSync.conectado) mhaAutoFusionar(); }, 45000);
+  }
+  if(typeof DriveSyncStock !== 'undefined'){
+    DriveSyncStock.init(()=>mhaActualizarEstadoDriveStock());
   }
   const navVer = document.getElementById('nav-version');
   if(navVer) navVer.textContent = VERSION;
