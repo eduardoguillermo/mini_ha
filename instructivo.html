@@ -231,7 +231,7 @@
 <nav class="sidebar">
   <div class="sidebar-logo">
     <h1>🏠 Mini HA</h1>
-    <p>Manual de usuario · v1.30</p>
+    <p>Manual de usuario · v1.40</p>
   </div>
 
   <div class="section-label">Introducción</div>
@@ -267,7 +267,7 @@
     <h1>🏠 Mini HA</h1>
     <p>Gestión de proyectos de Home Assistant y automatización — de la idea al cierre</p>
     <div class="hero-badges">
-      <span class="badge badge-green">✓ v1.30</span>
+      <span class="badge badge-green">✓ v1.40</span>
       <span class="badge badge-blue">✓ Sin servidor</span>
       <span class="badge badge-amber">✓ Datos locales</span>
       <span class="badge badge-purple">☁️ Sync opcional a Drive</span>
@@ -500,7 +500,7 @@
       <tr><td><strong>Nombre</strong> *</td><td>Nombre de la integración</td></tr>
       <tr><td><strong>Tipo</strong></td><td>Nativa / HACS / Add-on</td></tr>
       <tr><td><strong>Usuario / Cuenta</strong></td><td>Cuenta o identificador visible (texto plano)</td></tr>
-      <tr><td><strong>Password</strong></td><td>Dato sensible — queda oculto como contraseña</td></tr>
+      <tr><td><strong>Password</strong></td><td>Dato sensible — queda oculto como contraseña. En el listado hay botón 👁 para revelarlo, y en el formulario de carga/edición también hay un botón 👁 al lado del campo para verlo mientras se escribe</td></tr>
       <tr><td><strong>Notas</strong></td><td>Cualquier detalle extra de configuración</td></tr>
     </table>
     <p><strong>Ejemplos de uso:</strong></p>
@@ -645,6 +645,14 @@
         <div class="section-title">Historial de cambios</div>
         <div class="section-subtitle">Registro de versiones — de más reciente a más antigua</div>
       </div>
+    </div>
+
+    <div class="changelog-entry">
+      <div class="changelog-version"><span class="v-num">v1.40</span><span class="changelog-tag tag-feature">feature</span></div>
+      <ul class="changelog-list">
+        <li>Mejor contraste en la ficha de subproyecto: las operaciones marcadas como terminadas ya no se ven apagadas (se sacó el efecto de opacidad doble) y las notas de cada operación pasaron a un gris más claro y legible</li>
+        <li>Nuevo botón 👁 junto al campo Password en el formulario de <a href="#instalaciones-integraciones">🧩 Integraciones</a>, para poder verlo mientras se carga o edita (además del toggle que ya existía en el listado)</li>
+      </ul>
     </div>
 
     <div class="changelog-entry">
