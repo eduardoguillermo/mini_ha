@@ -2,7 +2,7 @@
 
 // ── CONSTANTES ────────────────────────────────────────────────────────────────
 const SKEY = 'mini-ha';
-const VERSION = 'v1.38';
+const VERSION = 'v1.39';
 
 const ESTADOS_PROY = ['Planificado','En curso','Pausado','Finalizado','Cancelado'];
 const ESTADO_PILL = {
@@ -757,7 +757,7 @@ function renderOps(p){
         <span class="op-num">${i+1}</span>
         <input type="checkbox" ${op.hecha?'checked':''} ${bloqueada?'disabled':''} onchange="toggleOp(${p.id},${i})"${lockTip}>
         <span class="op-desc ${descCls}">${esc(op.desc)}${bloqueada?' <span class="op-lock">&#128274;</span>':''}</span>
-        ${op.nota ? `<div style="font-size:11px;color:var(--text3);margin:2px 0 0 28px;font-style:italic"><span style="color:var(--primary);margin-right:4px">📋</span>${esc(op.nota)}</div>` : ''}
+        ${op.nota ? `<div style="font-size:11px;color:var(--text2);margin:2px 0 0 28px;font-style:italic"><span style="color:var(--primary);margin-right:4px">📋</span>${esc(op.nota)}</div>` : ''}
         ${(op.tiempoEst||op.tiempoReal) ? `<div style="font-size:10px;color:var(--text3);margin:3px 0 0 28px;display:flex;gap:10px;"><span>⏱ Est: <b style="color:var(--primary-light)">${op.tiempoEst||0}hs</b></span><span>✅ Real: <b style="color:#4caf7d">${op.tiempoReal||0}hs</b></span></div>` : ''}
         <div class="op-actions">
           <button class="btn btn-sm" onclick="moverOp(${p.id},${i},-1)" ${posEnSec===0?'disabled':''}>↑</button>
