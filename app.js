@@ -2,7 +2,7 @@
 
 // ── CONSTANTES ────────────────────────────────────────────────────────────────
 const SKEY = 'mini-ha';
-const VERSION = 'v1.39';
+const VERSION = 'v1.40';
 
 const ESTADOS_PROY = ['Planificado','En curso','Pausado','Finalizado','Cancelado'];
 const ESTADO_PILL = {
@@ -2161,6 +2161,14 @@ function instTogglePw(key){
   renderInstFicha(_instActual);
 }
 
+function instTogglePwField(inputId, btn){
+  const el = document.getElementById(inputId);
+  if(!el) return;
+  const shown = el.type === 'text';
+  el.type = shown ? 'password' : 'text';
+  if(btn) btn.textContent = shown ? '👁' : '🙈';
+}
+
 function instValorPorKey(key){
   const inst = instGet(_instActual);
   if(!inst) return '';
@@ -2549,7 +2557,7 @@ function instIntegModal(tid){
       <option ${t&&t.tipo==='HACS'?'selected':''}>HACS</option>
       <option ${t&&t.tipo==='Add-on'?'selected':''}>Add-on</option></select>
     <label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px" style="margin-top:8px">Usuario / Cuenta (opcional)</label><input style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" id="it-usuario" value="${esc(t&&t.usuario||'')}" placeholder="email de la cuenta cloud">
-    <label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px" style="margin-top:8px">Password (opcional)</label><input style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" type="password" id="it-pass" value="${esc(t&&t.pass||'')}">
+    <label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px" style="margin-top:8px">Password (opcional)</label><div style="display:flex;gap:6px"><input style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" type="password" id="it-pass" value="${esc(t&&t.pass||'')}"><button type="button" class="btn btn-sm" onclick="instTogglePwField('it-pass',this)" title="Mostrar/ocultar">👁</button></div>
     <label style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:3px" style="margin-top:8px">Notas</label><textarea style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--surface2);color:var(--text);font-family:inherit;outline:none;box-sizing:border-box" id="it-notas" rows="2" placeholder="Región, puerto, detalles de config...">${esc(t&&t.notas||'')}</textarea>`,
     `<button class="btn" onclick="cerrarModal()">Cancelar</button>
      <button class="btn btn-p" onclick="instIntegGuardar(${tid||'null'})">Guardar</button>`);
