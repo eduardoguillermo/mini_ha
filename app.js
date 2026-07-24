@@ -2,7 +2,7 @@
 
 // ── CONSTANTES ────────────────────────────────────────────────────────────────
 const SKEY = 'mini-ha';
-const VERSION = 'v1.40';
+const VERSION = 'v1.41';
 
 const ESTADOS_PROY = ['Planificado','En curso','Pausado','Finalizado','Cancelado'];
 const ESTADO_PILL = {
@@ -704,8 +704,11 @@ function renderFicha(id){
   // Historial
   if(p.historial && p.historial.length){
     html += `<div class="card">
-      <div class="ch"><span class="ct">Historial</span></div>
-      <div class="card-body">
+      <div class="ch" style="cursor:pointer" onclick="_proyHistCerrado=!_proyHistCerrado;renderFicha(${p.id})">
+        <span class="ct">Historial</span>
+        <span style="font-size:11px;color:var(--text3)">${p.historial.length} ${_proyHistCerrado?'▸':'▾'}</span>
+      </div>
+      ${_proyHistCerrado ? '' : `<div class="card-body">
         ${p.historial.slice(0,20).map(h =>
           `<div class="hist-item">
             <span class="hist-fecha">${fmtFecha(h.fecha)}</span>
@@ -713,7 +716,7 @@ function renderFicha(id){
           </div>`
         ).join('')}
         ${p.historial.length > 20 ? `<div class="text3" style="font-size:10px;margin-top:6px">... y ${p.historial.length-20} entradas mas</div>` : ''}
-      </div>
+      </div>`}
     </div>`;
   }
 
@@ -2111,6 +2114,7 @@ let _instFiltro = { q: '', tag: 'todas' };
 let _instPwVis = {};        // claves 'coleccion:id' con password visible
 let _instSecClosed = {};    // secciones colapsadas en la ficha
 let _instDevQ = '';         // filtro de dispositivos en la ficha
+let _proyHistCerrado = true;  // historial de subproyecto colapsado por defecto
 
 const INST_ESTADOS = ['Activa','Mantenimiento','Baja'];
 const INST_ESTADO_PILL = { 'Activa':'p-fin', 'Mantenimiento':'p-pausado', 'Baja':'p-cancel' };
