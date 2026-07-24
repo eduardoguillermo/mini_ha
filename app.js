@@ -2,7 +2,7 @@
 
 // ── CONSTANTES ────────────────────────────────────────────────────────────────
 const SKEY = 'mini-ha';
-const VERSION = 'v1.42';
+const VERSION = 'v1.43';
 
 const ESTADOS_PROY = ['Planificado','En curso','Pausado','Finalizado','Cancelado'];
 const ESTADO_PILL = {
@@ -617,30 +617,32 @@ function renderFicha(id){
   </div>
 
   <div class="card">
-    <div class="ch">
+    <div class="ch" style="cursor:pointer" onclick="_proyOpsCerrado=!_proyOpsCerrado;renderFicha(${p.id})">
       <span class="ct">Operaciones <span class="text3" style="font-size:11px;font-weight:400">${pct}% completado</span></span>
       <span style="font-size:11px;color:var(--text3);margin-left:auto;margin-right:8px;">&#9201; Est: <b style="color:var(--primary-light)">${(p.operaciones||[]).reduce((a,o)=>a+(o.tiempoEst||0),0)}hs</b> &nbsp;&middot;&nbsp; &#10003; Real: <b style="color:#4caf7d">${(p.operaciones||[]).reduce((a,o)=>a+(o.tiempoReal||0),0)}hs</b></span>
-      <button class="btn btn-sm btn-p" onclick="modalNuevaOp(${p.id})">+ Agregar</button>
+      <span style="font-size:11px;color:var(--text3);margin-right:8px">${_proyOpsCerrado?'▸':'▾'}</span>
+      <button class="btn btn-sm btn-p" onclick="event.stopPropagation();modalNuevaOp(${p.id})">+ Agregar</button>
     </div>
-    <div class="card-body" id="ficha-ops">
+    ${_proyOpsCerrado ? '' : `<div class="card-body" id="ficha-ops">
       ${renderOps(p)}
-    </div>
+    </div>`}
   </div>`;
 
   // Materiales
   const tieneMats = p.materiales && p.materiales.length;
   const tieneMatsCat = tieneMats && p.materiales.some(m => m.compId);
   html += `<div class="card">
-    <div class="ch">
+    <div class="ch" style="cursor:pointer" onclick="_proyMatsCerrado=!_proyMatsCerrado;renderFicha(${p.id})">
       <span class="ct">Materiales usados</span>
+      <span style="font-size:11px;color:var(--text3);margin-left:auto;margin-right:8px">${_proyMatsCerrado?'▸':'▾'}</span>
       <div style="display:flex;gap:6px">
-        ${tieneMatsCat ? `<button class="btn btn-sm btn-g" onclick="exportarSalidasVSS(${p.id})">⬇️ Exportar salidas VSS</button>` : ''}
-        <button class="btn btn-sm btn-p" onclick="modalNuevoMaterial(${p.id})">+ Agregar</button>
+        ${tieneMatsCat ? `<button class="btn btn-sm btn-g" onclick="event.stopPropagation();exportarSalidasVSS(${p.id})">⬇️ Exportar salidas VSS</button>` : ''}
+        <button class="btn btn-sm btn-p" onclick="event.stopPropagation();modalNuevoMaterial(${p.id})">+ Agregar</button>
       </div>
     </div>
-    <div class="card-body" id="ficha-mats">
+    ${_proyMatsCerrado ? '' : `<div class="card-body" id="ficha-mats">
       ${renderMateriales(p)}
-    </div>
+    </div>`}
   </div>`;
   if(p.dispositivos && p.dispositivos.trim()){
     html += `<div class="card">
@@ -2115,6 +2117,8 @@ let _instPwVis = {};        // claves 'coleccion:id' con password visible
 let _instSecClosed = {};    // secciones colapsadas en la ficha
 let _instDevQ = '';         // filtro de dispositivos en la ficha
 let _proyHistCerrado = true;  // historial de subproyecto colapsado por defecto
+let _proyOpsCerrado = false;   // operaciones de subproyecto, abierto por defecto
+let _proyMatsCerrado = false;  // materiales usados de subproyecto, abierto por defecto
 
 const INST_ESTADOS = ['Activa','Mantenimiento','Baja'];
 const INST_ESTADO_PILL = { 'Activa':'p-fin', 'Mantenimiento':'p-pausado', 'Baja':'p-cancel' };
