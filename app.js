@@ -2,7 +2,7 @@
 
 // ── CONSTANTES ────────────────────────────────────────────────────────────────
 const SKEY = 'mini-ha';
-const VERSION = 'v1.41';
+const VERSION = 'v1.42';
 
 const ESTADOS_PROY = ['Planificado','En curso','Pausado','Finalizado','Cancelado'];
 const ESTADO_PILL = {
@@ -2692,6 +2692,38 @@ function instNotaAgregar(){
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
+function mhaMostrarToast(mensaje){
+  document.getElementById('mha-toast')?.remove();
+  const t = document.createElement('div');
+  t.id = 'mha-toast';
+  t.textContent = mensaje;
+  t.style.cssText = `
+    position:fixed; top:16px; left:50%; transform:translateX(-50%) translateY(-20px);
+    background:#4caf7d; color:white; padding:10px 18px; border-radius:8px;
+    font-size:13px; font-weight:600; box-shadow:0 8px 24px rgba(0,0,0,0.25);
+    z-index:9999; opacity:0; transition:opacity 0.25s ease, transform 0.25s ease;
+    pointer-events:none;
+  `;
+  document.body.appendChild(t);
+  requestAnimationFrame(() => {
+    t.style.opacity = '1';
+    t.style.transform = 'translateX(-50%) translateY(0)';
+  });
+  setTimeout(() => {
+    t.style.opacity = '0';
+    t.style.transform = 'translateX(-50%) translateY(-20px)';
+    setTimeout(() => t.remove(), 300);
+  }, 2500);
+}
+
+function mhaMarcarFusionado(){
+  const el = document.getElementById('mha-drive-status');
+  if(!el) return;
+  const ahora = new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+  el.textContent = `☁️ Fusionado ${ahora}`;
+  el.style.color = '#4caf7d';
+}
+
 async function mhaAutoFusionar(){
   if(typeof DriveSync === 'undefined' || !DriveSync.conectado) return;
   try{
@@ -2704,7 +2736,9 @@ async function mhaAutoFusionar(){
       if(['dashboard','proyectos','proy-ficha','instalaciones','inst-ficha'].includes(_panel)){
         goTo(_panel);
       }
+      mhaMostrarToast('☁️ Fusionado: datos actualizados de Drive');
     }
+    mhaMarcarFusionado();
   }catch(e){ console.error('Auto-fusión Drive:', e); }
 }
 
