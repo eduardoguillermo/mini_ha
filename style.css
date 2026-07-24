@@ -119,10 +119,10 @@ tr:hover td{background:rgba(255,255,255,.02)}
 
 /* ── OPERACIONES ──────────────────────────────────────────── */
 .op-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--r);margin-bottom:4px;background:var(--surface2);border:1px solid var(--border);transition:opacity .15s}
-.op-item.hecha{opacity:.5}
+.op-item.hecha{opacity:.75}
 .op-item input[type=checkbox]{width:15px;height:15px;accent-color:var(--primary);cursor:pointer;flex-shrink:0}
 .op-desc{flex:1;font-size:12px;cursor:pointer}
-.op-desc.hecha{text-decoration:line-through;color:var(--text3)}
+.op-desc.hecha{text-decoration:line-through;color:var(--text2)}
 .op-actions{display:flex;gap:4px;opacity:0;transition:opacity .15s}
 .op-item:hover .op-actions{opacity:1}
 .op-num{width:20px;flex-shrink:0;font-size:11px;font-weight:700;color:var(--text3);text-align:right}
