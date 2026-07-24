@@ -2,7 +2,7 @@
 
 // ── CONSTANTES ────────────────────────────────────────────────────────────────
 const SKEY = 'mini-ha';
-const VERSION = 'v1.43';
+const VERSION = 'v1.44';
 
 const ESTADOS_PROY = ['Planificado','En curso','Pausado','Finalizado','Cancelado'];
 const ESTADO_PILL = {
@@ -280,12 +280,35 @@ function mhaDriveReemplazar(){
 
 async function mhaSalir(){
   const ok = mhaHacerSnapshot(true);
-  let driveMsg = '';
-  if(typeof DriveSync !== 'undefined' && DriveSync.conectado){
-    const subioDrive = await mhaSubirDrive();
-    driveMsg = subioDrive ? '\n☁️ Backup en Drive actualizado.' : '\n⚠️ No se pudo subir a Drive.';
+
+  if(typeof DriveSync === 'undefined'){
+    alert('⚠️ El módulo de Drive no cargó. Recargá la página e intentá de nuevo.\nNo se cierra hasta poder sincronizar con Drive.');
+    return;
   }
+
+  // Si no está conectado, intento silencioso y espero un poco a que llegue el token
+  if(!DriveSync.conectado){
+    DriveSync.conectar();
+    for(let i=0; i<13 && !DriveSync.conectado; i++){
+      await new Promise(r => setTimeout(r, 300));
+    }
+  }
+
+  if(!DriveSync.conectado){
+    const reconectar = confirm('⚠️ Drive no está conectado. No se puede cerrar sin guardar el backup en la nube.\n\n¿Conectar Drive ahora?');
+    if(reconectar) DriveSync.forzarReconexion();
+    return; // no cierra
+  }
+
+  const subioDrive = await mhaSubirDrive();
   const msg = ok ? '✅ Snapshot guardado.' : '⚠️ No se pudo guardar snapshot.';
+  const driveMsg = subioDrive ? '\n☁️ Backup en Drive actualizado.' : '\n⚠️ No se pudo subir a Drive.';
+
+  if(!subioDrive){
+    alert(msg + driveMsg + '\n\nNo se cierra: reintentá o revisá la conexión a Drive.');
+    return; // no cierra si la subida falló
+  }
+
   if(confirm(msg + driveMsg + '\n¿Cerrar Mini HA?')) window.close();
 }
 
